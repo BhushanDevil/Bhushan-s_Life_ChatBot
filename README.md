@@ -30,7 +30,18 @@ A voice-enabled web application built for interview and recruiter interactions. 
 - Node.js >= 20.0.0
 - Google AI Studio API Key (free tier)
 
-### Setup
+### Available TTS Voices
+You can configure `TTS_VOICE` in `.env.local` to any of the following Gemini prebuilt voices:
+- `Puck`: Warm, natural, friendly conversational tone (Default, recommended for Bhushan's persona)
+- `Charon`: Deeper, calm, thoughtful tone
+- `Kore`: Clear, bright, articulate tone
+- `Fenrir`: Strong, confident tone
+- `Aoede`: Expressive, warm female tone
+
+### Voice Generation Models
+Set `GEMINI_TTS_MODEL` in `.env.local` to a multimodal audio-output capable Gemini model:
+- `gemini-2.0-flash` (or `gemini-2.5-flash`)
+
 1. Copy the environment template:
    ```bash
    cp .env.example .env.local
