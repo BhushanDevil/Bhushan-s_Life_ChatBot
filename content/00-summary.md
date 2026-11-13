@@ -1,0 +1,3 @@
+# Summary
+
+I grew up in Bandra, Mumbai, and got hooked on computers at eleven when my dad brought home our first computer with internet. I studied Computer Engineering at Rizvi College, then did a master’s in Data Science and Management through IIT Ropar and IIM Amritsar to combine the technical side with the business side. Today I’m an AI and Data Scientist at FCI CCM in Mumbai, working on AI and data tools for banks and insurers. I’m a logical problem solver who likes to find the root cause, and I’m also the funny one who likes keeping people around me in a good mood. Next, I want to grow into someone who can take an AI idea from business problem to a reliable product, and eventually lead a team.
