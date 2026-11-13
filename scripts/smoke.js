@@ -77,7 +77,7 @@ async function runSmokeTests() {
   // Test 1: GET / (serves index.html)
   const homeRes = await simulate(listener, { method: 'GET', url: '/' });
   console.log(`[TEST 1] GET / -> Status ${homeRes.statusCode}`);
-  if (homeRes.statusCode !== 200 || !homeRes.body.includes("Bhushan's Voice Bot")) {
+  if (homeRes.statusCode !== 200 || !homeRes.body.includes("Ask Bhushan")) {
     throw new Error(`Home page test failed: Status ${homeRes.statusCode}, body: ${homeRes.body.slice(0, 100)}`);
   }
   console.log('  ✓ Static index.html served successfully.');

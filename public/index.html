@@ -3,55 +3,120 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bhushan's Voice Bot</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      margin: 0;
-      padding: 2rem;
-      background-color: #faf9f6;
-      color: #1a1a1a;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      box-sizing: border-box;
-      text-align: center;
-    }
-    .card {
-      background: #ffffff;
-      padding: 2.5rem 2rem;
-      border-radius: 16px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
-      max-width: 480px;
-      width: 100%;
-    }
-    h1 {
-      font-size: 1.6rem;
-      margin-bottom: 0.5rem;
-    }
-    p {
-      color: #555;
-      line-height: 1.5;
-    }
-    .badge {
-      display: inline-block;
-      margin-top: 1rem;
-      padding: 0.4rem 0.8rem;
-      background: #eef2ff;
-      color: #4338ca;
-      border-radius: 9999px;
-      font-size: 0.85rem;
-      font-weight: 500;
-    }
-  </style>
+  <meta name="description" content="AI voice bot answering questions as Bhushan in first person using Gemini">
+  <title>Ask Bhushan — AI Voice Bot</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="card">
-    <h1>Bhushan's Voice Bot</h1>
-    <p>The AI voice bot is currently being built. Tap-to-ask questions and voice answers coming shortly.</p>
-    <div class="badge">Status: Project Scaffolding in Progress</div>
+  <div class="app-layout">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-top">
+        <div class="title-group">
+          <h1>Ask Bhushan</h1>
+          <p class="subtitle">AI Voice & Data Science Portfolio</p>
+        </div>
+        <div class="header-actions">
+          <button id="btn-about" class="btn-text" aria-haspopup="dialog" aria-label="About this bot">About</button>
+          <button id="btn-reset" class="btn-text" aria-label="Start new conversation">New Chat</button>
+        </div>
+      </div>
+      <div class="ai-banner" role="note">
+        <span class="banner-badge">AI Voice</span>
+        <span class="banner-text">This is an AI voice version of Bhushan, built to answer in his words.</span>
+      </div>
+    </header>
+
+    <!-- Example Chips -->
+    <section class="chips-section" aria-label="Suggested interview questions">
+      <p class="chips-label">Tap an example question:</p>
+      <div class="chips-container" id="chips-container">
+        <button class="chip" data-question="What should we know about your life story in a few sentences?">Life Story</button>
+        <button class="chip" data-question="What is your number one superpower?">Superpower</button>
+        <button class="chip" data-question="What are the top three areas you would like to grow in?">Growth Areas</button>
+        <button class="chip" data-question="What misconception do your coworkers have about you?">Misconception</button>
+        <button class="chip" data-question="How do you push your boundaries and limits?">Pushing Limits</button>
+      </div>
+    </section>
+
+    <!-- Chat / Transcript Stream -->
+    <main class="chat-main" id="chat-stream" role="log" aria-live="polite" aria-label="Conversation Transcript">
+      <div class="welcome-message">
+        <p>👋 Hi! I'm an AI voice version of Bhushan. Tap any question above, type below, or tap the microphone to ask anything about my work, projects, and background.</p>
+      </div>
+    </main>
+
+    <!-- Central Voice & Interaction Controls -->
+    <footer class="app-controls">
+      <!-- Voice status indicator and central mic button -->
+      <div class="voice-control-area">
+        <div class="status-indicator" id="status-indicator" aria-live="assertive">
+          <span class="status-text" id="status-text">Ready to talk</span>
+          <span class="status-timer" id="status-timer" hidden>00:00</span>
+        </div>
+
+        <div class="mic-wrapper">
+          <button id="btn-mic" class="btn-mic idle" aria-label="Tap to talk" title="Tap to talk">
+            <span class="mic-ring" aria-hidden="true"></span>
+            <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" x2="12" y1="19" y2="22"/>
+            </svg>
+            <div class="thinking-dots" aria-hidden="true">
+              <span></span><span></span><span></span>
+            </div>
+            <div class="speaking-bars" aria-hidden="true">
+              <span></span><span></span><span></span><span></span>
+            </div>
+          </button>
+          <button id="btn-stop" class="btn-stop" aria-label="Stop speaking" hidden>Stop</button>
+        </div>
+      </div>
+
+      <!-- Backup Text Input Form -->
+      <form id="chat-form" class="chat-form">
+        <input 
+          type="text" 
+          id="chat-input" 
+          class="chat-input" 
+          placeholder="Or type a question for Bhushan..." 
+          maxlength="500" 
+          autocomplete="off"
+          aria-label="Ask Bhushan a question"
+        >
+        <button type="submit" id="btn-send" class="btn-send" aria-label="Send question">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </form>
+    </footer>
   </div>
+
+  <!-- Toast Notification Region -->
+  <div id="toast-region" class="toast-region" role="status" aria-live="polite"></div>
+
+  <!-- About Dialog -->
+  <dialog id="about-dialog" class="about-dialog">
+    <div class="dialog-content">
+      <div class="dialog-header">
+        <h2>About This Bot</h2>
+        <button id="btn-close-dialog" class="btn-close" aria-label="Close dialog">&times;</button>
+      </div>
+      <div class="dialog-body">
+        <p><strong>What is this?</strong> This is an interactive voice-enabled AI application built for a job assignment. It responds to interview questions authentically in first person, as Bhushan would answer them.</p>
+        <p><strong>How does it work?</strong> Powered by Google's Gemini models for understanding and voice synthesis. All answers are strictly grounded in a verified profile book authored from Bhushan's real experience, education, and achievements.</p>
+        <p><strong>Privacy & Trust:</strong> No voice recordings or conversation chats are stored on any server or database. The bot operates with hard rules protecting company confidentiality and avoiding fabricated facts.</p>
+        <p><strong>Note:</strong> Like all generative AI systems, responses may occasionally vary. For critical hiring inquiries, you can follow up directly through the assignment submission platform.</p>
+      </div>
+      <div class="dialog-footer">
+        <button id="btn-dialog-done" class="btn-primary">Got it</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>

@@ -1,0 +1,676 @@
+/* ==========================================================================
+   CSS Variables & Design Tokens (Light & Dark Theme)
+   ========================================================================== */
+:root {
+  --bg-primary: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #ffffff;
+  --bg-subtle: #f1f5f9;
+  
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --text-inverse: #ffffff;
+
+  --accent-primary: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-subtle: #eff6ff;
+  --accent-border: #bfdbfe;
+
+  --mic-idle: #2563eb;
+  --mic-listening: #ef4444;
+  --mic-thinking: #f59e0b;
+  --mic-speaking: #10b981;
+
+  --border-subtle: #e2e8f0;
+  --border-strong: #cbd5e1;
+
+  --bubble-user: #2563eb;
+  --bubble-user-text: #ffffff;
+  --bubble-bot: #ffffff;
+  --bubble-bot-text: #0f172a;
+  --bubble-bot-border: #e2e8f0;
+
+  --toast-bg: #1e293b;
+  --toast-text: #ffffff;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.12);
+
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --transition-normal: 0.2s ease-in-out;
+  --tap-target-min: 44px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-primary: #0b0f19;
+    --bg-surface: #111827;
+    --bg-surface-elevated: #1f2937;
+    --bg-subtle: #1e293b;
+
+    --text-primary: #f9fafb;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --text-inverse: #0b0f19;
+
+    --accent-primary: #3b82f6;
+    --accent-hover: #60a5fa;
+    --accent-subtle: rgba(59, 130, 246, 0.15);
+    --accent-border: #1d4ed8;
+
+    --border-subtle: #374151;
+    --border-strong: #4b5563;
+
+    --bubble-user: #2563eb;
+    --bubble-user-text: #ffffff;
+    --bubble-bot: #1f2937;
+    --bubble-bot-text: #f9fafb;
+    --bubble-bot-border: #374151;
+
+    --toast-bg: #f8fafc;
+    --toast-text: #0f172a;
+  }
+}
+
+/* ==========================================================================
+   Base & Reset
+   ========================================================================== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  font-family: var(--font-family);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input {
+  font: inherit;
+  color: inherit;
+}
+
+/* Visible focus outline for accessibility */
+button:focus-visible, input:focus-visible, a:focus-visible {
+  outline: 3px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ==========================================================================
+   Layout Structure
+   ========================================================================== */
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-width: 800px;
+  margin: 0 auto;
+  background-color: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   Header & Banner
+   ========================================================================== */
+.app-header {
+  padding: 1rem 1.25rem 0.75rem;
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.6rem;
+}
+
+.title-group h1 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.title-group .subtitle {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-text {
+  min-height: var(--tap-target-min);
+  min-width: var(--tap-target-min);
+  padding: 0.4rem 0.8rem;
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.btn-text:hover {
+  background-color: var(--bg-subtle);
+  color: var(--text-primary);
+}
+
+.ai-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--accent-subtle);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.825rem;
+}
+
+.banner-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.15rem 0.4rem;
+  background-color: var(--accent-primary);
+  color: var(--text-inverse);
+  border-radius: var(--radius-sm);
+}
+
+.banner-text {
+  color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   Suggested Chips
+   ========================================================================== */
+.chips-section {
+  padding: 0.6rem 1.25rem;
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.chips-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 0.4rem;
+  font-weight: 500;
+}
+
+.chips-container {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.chips-container::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  min-height: var(--tap-target-min);
+  white-space: nowrap;
+  padding: 0.4rem 0.9rem;
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.chip:hover {
+  background-color: var(--accent-subtle);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+/* ==========================================================================
+   Chat Stream
+   ========================================================================== */
+.chat-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.welcome-message {
+  padding: 1rem 1.25rem;
+  background-color: var(--bg-subtle);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--accent-primary);
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.chat-bubble-row {
+  display: flex;
+  flex-direction: column;
+  max-width: 85%;
+}
+
+.chat-bubble-row.user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.chat-bubble-row.bot {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.bubble-sender {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.chat-bubble {
+  padding: 0.85rem 1.15rem;
+  border-radius: var(--radius-md);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.chat-bubble.user {
+  background-color: var(--bubble-user);
+  color: var(--bubble-user-text);
+  border-bottom-right-radius: 4px;
+}
+
+.chat-bubble.bot {
+  background-color: var(--bubble-bot);
+  color: var(--bubble-bot-text);
+  border: 1px solid var(--bubble-bot-border);
+  border-bottom-left-radius: 4px;
+  box-shadow: var(--shadow-sm);
+}
+
+.bubble-actions {
+  margin-top: 0.4rem;
+}
+
+.btn-tell-more {
+  min-height: 36px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8rem;
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  color: var(--accent-primary);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.btn-tell-more:hover {
+  background-color: var(--accent-subtle);
+  border-color: var(--accent-primary);
+}
+
+/* ==========================================================================
+   Voice Controls & Mic States
+   ========================================================================== */
+.app-controls {
+  padding: 1rem 1.25rem 1.25rem;
+  background-color: var(--bg-surface);
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  flex-shrink: 0;
+}
+
+.voice-control-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.825rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.status-timer {
+  font-family: monospace;
+  font-weight: 700;
+  color: var(--mic-listening);
+}
+
+.mic-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-mic {
+  width: 68px;
+  height: 68px;
+  border-radius: var(--radius-full);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  position: relative;
+  transition: transform var(--transition-normal), background-color var(--transition-normal);
+  box-shadow: var(--shadow-md);
+  z-index: 2;
+}
+
+.btn-mic:active {
+  transform: scale(0.95);
+}
+
+/* Mic State: Idle */
+.btn-mic.idle {
+  background-color: var(--mic-idle);
+}
+.btn-mic.idle .mic-icon { display: block; }
+.btn-mic.idle .thinking-dots,
+.btn-mic.idle .speaking-bars,
+.btn-mic.idle .mic-ring { display: none; }
+
+/* Mic State: Listening */
+.btn-mic.listening {
+  background-color: var(--mic-listening);
+}
+.btn-mic.listening .mic-icon { display: block; }
+.btn-mic.listening .thinking-dots,
+.btn-mic.listening .speaking-bars { display: none; }
+.btn-mic.listening .mic-ring {
+  display: block;
+  position: absolute;
+  top: -8px; left: -8px; right: -8px; bottom: -8px;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--mic-listening);
+  animation: pulseRing 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+/* Mic State: Thinking */
+.btn-mic.thinking {
+  background-color: var(--mic-thinking);
+}
+.btn-mic.thinking .mic-icon,
+.btn-mic.thinking .speaking-bars,
+.btn-mic.thinking .mic-ring { display: none; }
+.btn-mic.thinking .thinking-dots {
+  display: flex;
+  gap: 4px;
+}
+.thinking-dots span {
+  width: 8px;
+  height: 8px;
+  background-color: #ffffff;
+  border-radius: var(--radius-full);
+  animation: bounceDot 1.4s infinite ease-in-out both;
+}
+.thinking-dots span:nth-child(1) { animation-delay: -0.32s; }
+.thinking-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+/* Mic State: Speaking */
+.btn-mic.speaking {
+  background-color: var(--mic-speaking);
+}
+.btn-mic.speaking .mic-icon,
+.btn-mic.speaking .thinking-dots,
+.btn-mic.speaking .mic-ring { display: none; }
+.btn-mic.speaking .speaking-bars {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 24px;
+}
+.speaking-bars span {
+  width: 4px;
+  background-color: #ffffff;
+  border-radius: var(--radius-full);
+  animation: waveBar 1.2s ease-in-out infinite;
+}
+.speaking-bars span:nth-child(1) { height: 12px; animation-delay: 0.1s; }
+.speaking-bars span:nth-child(2) { height: 22px; animation-delay: 0.3s; }
+.speaking-bars span:nth-child(3) { height: 16px; animation-delay: 0.2s; }
+.speaking-bars span:nth-child(4) { height: 10px; animation-delay: 0.4s; }
+
+.mic-icon {
+  width: 28px;
+  height: 28px;
+}
+
+/* Stop speaking button */
+.btn-stop {
+  margin-left: 1rem;
+  min-height: var(--tap-target-min);
+  padding: 0.4rem 1rem;
+  background-color: #ef4444;
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: background-color var(--transition-normal);
+}
+.btn-stop:hover {
+  background-color: #dc2626;
+}
+
+/* Keyframe animations */
+@keyframes pulseRing {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.18); opacity: 0.3; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+
+@keyframes bounceDot {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1); }
+}
+
+@keyframes waveBar {
+  0%, 100% { height: 8px; }
+  50% { height: 24px; }
+}
+
+/* ==========================================================================
+   Chat Input Form (Backup Typing)
+   ========================================================================== */
+.chat-form {
+  display: flex;
+  width: 100%;
+  gap: 0.5rem;
+}
+
+.chat-input {
+  flex: 1;
+  min-height: var(--tap-target-min);
+  padding: 0.5rem 1rem;
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  transition: border-color var(--transition-normal);
+}
+
+.chat-input:focus {
+  border-color: var(--accent-primary);
+}
+
+.btn-send {
+  min-width: var(--tap-target-min);
+  min-height: var(--tap-target-min);
+  border-radius: var(--radius-full);
+  border: none;
+  background-color: var(--accent-primary);
+  color: var(--text-inverse);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--transition-normal);
+}
+
+.btn-send:hover {
+  background-color: var(--accent-hover);
+}
+
+.btn-send svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ==========================================================================
+   Toast Notifications
+   ========================================================================== */
+.toast-region {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+  max-width: 90%;
+  width: 400px;
+}
+
+.toast {
+  padding: 0.75rem 1.25rem;
+  background-color: var(--toast-bg);
+  color: var(--toast-text);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.3s ease;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ==========================================================================
+   About Dialog
+   ========================================================================== */
+.about-dialog {
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: 0;
+  background-color: var(--bg-surface-elevated);
+  color: var(--text-primary);
+  max-width: 500px;
+  width: 90%;
+  margin: auto;
+  box-shadow: var(--shadow-lg);
+}
+
+.about-dialog::backdrop {
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.dialog-content {
+  padding: 1.5rem;
+}
+
+.dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.dialog-header h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.btn-close {
+  min-width: var(--tap-target-min);
+  min-height: var(--tap-target-min);
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.dialog-footer {
+  margin-top: 1.25rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-primary {
+  min-height: var(--tap-target-min);
+  padding: 0.5rem 1.25rem;
+  background-color: var(--accent-primary);
+  color: var(--text-inverse);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
