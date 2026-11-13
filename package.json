@@ -1,0 +1,16 @@
+{
+  "name": "bhushans-life-chatbot",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Voice bot web app answering interview questions in Bhushan's authentic voice using Gemini API",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/dev-server.js",
+    "cache": "node scripts/generate-cache.js",
+    "eval": "node scripts/eval.js",
+    "smoke": "node scripts/smoke.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
