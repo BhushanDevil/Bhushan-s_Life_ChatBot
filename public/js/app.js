@@ -1,19 +1,44 @@
 /**
  * public/js/app.js
- * Main application logic coordinating UI, history, text queries, and speech.
+ * Main application orchestrator: connects audio recording, speech synthesis,
+ * UI states, fallback pipelines, and API messaging.
  */
 
-import { elements, setControlState, appendMessage, clearChatStream, showToast, initDialog } from './ui.js';
-import { sendChatMessage } from './api.js';
+import {
+  elements,
+  setControlState,
+  updateTimerDisplay,
+  appendMessage,
+  clearChatStream,
+  showToast,
+  initDialog
+} from './ui.js';
+import { sendChatMessage, requestSpeech } from './api.js';
+import {
+  unlockAudioContext,
+  startRecording,
+  stopRecording,
+  isRecording,
+  playWavBase64,
+  speakWithDeviceVoice,
+  stopPlayback,
+  tryBrowserSpeechRecognition
+} from './audio.js';
 
 // Application State
 const state = {
   history: [], // [{ role: 'user' | 'model', text: string }] (max 6 turns)
-  isProcessing: false
+  currentState: 'idle', // 'idle' | 'listening' | 'thinking' | 'speaking'
+  recordingPromise: null
 };
 
+function setState(newState) {
+  state.currentState = newState;
+  setControlState(newState);
+}
+
 /**
- * Adds a message turn to the short-term history (keeps last 6 turns)
+ * Appends a message turn to history (capped at 6 recent turns)
  */
 function recordTurn(role, text) {
   state.history.push({ role, text });
@@ -23,74 +48,201 @@ function recordTurn(role, text) {
 }
 
 /**
- * Handles sending a text question to the chat API
+ * Handles playing the spoken voice for an answer (Gemini TTS -> Device Voice fallback)
  */
-async function handleTextQuery(queryText) {
-  if (state.isProcessing) return;
-  const question = queryText.trim();
-  if (!question) return;
+async function speakAnswer(answerText) {
+  if (!answerText) {
+    setState('idle');
+    return;
+  }
 
-  state.isProcessing = true;
-  setControlState('thinking');
-
-  // Display user's question bubble immediately
-  appendMessage('user', question);
-  recordTurn('user', question);
-
-  // Clear input field
-  elements.chatInput.value = '';
+  setState('speaking');
 
   try {
-    const res = await sendChatMessage({
-      text: question,
-      history: state.history.slice(0, -1) // send history prior to current turn
-    });
+    const ttsRes = await requestSpeech(answerText);
+
+    if (ttsRes.ok && ttsRes.audio) {
+      await playWavBase64(ttsRes.audio, () => {
+        setState('idle');
+      });
+      return;
+    }
+  } catch (err) {
+    console.warn('Gemini TTS failed, engaging device voice fallback:', err);
+  }
+
+  // Graceful fallback to device voice
+  speakWithDeviceVoice(answerText, () => {
+    setState('idle');
+  });
+}
+
+/**
+ * Processes a question query (either typed text or recorded audio)
+ */
+async function processQuery({ text = null, audioWavBase64 = null }) {
+  if (state.currentState === 'thinking') return;
+
+  setState('thinking');
+
+  // If text, show user bubble immediately
+  if (text) {
+    appendMessage('user', text);
+    recordTurn('user', text);
+    elements.chatInput.value = '';
+  }
+
+  try {
+    const chatPayload = {
+      history: state.history.slice(0, text ? -1 : undefined)
+    };
+
+    if (text) chatPayload.text = text;
+    if (audioWavBase64) chatPayload.audio = { mimeType: 'audio/wav', data: audioWavBase64 };
+
+    const res = await sendChatMessage(chatPayload);
 
     if (!res.ok) {
-      showToast(res.error?.message || 'Failed to get an answer. Please try again.');
-      setControlState('idle');
-      state.isProcessing = false;
+      showToast(res.error?.message || 'Could not get an answer. Please try again.');
+      setState('idle');
       return;
     }
 
-    const answerText = res.data.answer;
-    recordTurn('model', answerText);
+    const { question, answer } = res.data;
 
-    // Display Bhushan's answer bubble
-    appendMessage('bot', answerText, () => {
+    // If audio query, show the transcribed question
+    if (audioWavBase64 && question && question !== 'unclear') {
+      appendMessage('user', question);
+      recordTurn('user', question);
+    }
+
+    recordTurn('model', answer);
+
+    // Show answer text bubble immediately on screen
+    appendMessage('bot', answer, () => {
       handleTextQuery('Could you tell me more about that?');
     });
 
-    // In Prompt 5 (text phase), transition back to idle
-    // In Prompt 6, speaking audio is triggered here
-    setControlState('idle');
+    // Start spoken voice output
+    await speakAnswer(answer);
   } catch (err) {
-    console.error('Query error:', err);
-    showToast('An unexpected error occurred. Please try again.');
-    setControlState('idle');
-  } finally {
-    state.isProcessing = false;
+    console.error('Chat processing error:', err);
+    showToast('An unexpected network error occurred. Please try again.');
+    setState('idle');
   }
 }
 
 /**
- * Clears the conversation and starts fresh
+ * Submits a text question
+ */
+function handleTextQuery(queryText) {
+  const text = queryText.trim();
+  if (!text) return;
+  stopPlayback();
+  processQuery({ text });
+}
+
+/**
+ * Central microphone button handler
+ */
+async function handleMicClick() {
+  unlockAudioContext();
+
+  // If already speaking, stop playback and return to idle
+  if (state.currentState === 'speaking') {
+    stopPlayback();
+    setState('idle');
+    return;
+  }
+
+  // If thinking, ignore taps
+  if (state.currentState === 'thinking') {
+    return;
+  }
+
+  // If currently listening, second tap stops recording and submits
+  if (state.currentState === 'listening') {
+    stopRecording();
+    return;
+  }
+
+  // If idle, start listening
+  stopPlayback();
+  setState('listening');
+
+  try {
+    const recordingPromise = startRecording({
+      onTick: (seconds) => updateTimerDisplay(seconds)
+    });
+
+    const wavBase64 = await recordingPromise;
+
+    if (!wavBase64) {
+      setState('idle');
+      return;
+    }
+
+    await processQuery({ audioWavBase64: wavBase64 });
+  } catch (err) {
+    console.warn('Microphone recording error:', err);
+    setState('idle');
+
+    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || err.message === 'MEDIA_NOT_SUPPORTED') {
+      // Try browser speech recognition fallback
+      const recognitionStarted = tryBrowserSpeechRecognition(
+        (transcript) => {
+          handleTextQuery(transcript);
+        },
+        () => {
+          showToast('Microphone access was denied. You can type your question in the text box below.');
+          elements.chatInput.focus();
+        }
+      );
+
+      if (!recognitionStarted) {
+        showToast('Microphone access was denied. You can type your question in the text box below.');
+        elements.chatInput.focus();
+      }
+    } else {
+      showToast('Could not record audio. Please try typing your question.');
+      elements.chatInput.focus();
+    }
+  }
+}
+
+/**
+ * Resets the conversation to a clean slate
  */
 function resetConversation() {
+  stopPlayback();
+  if (isRecording()) stopRecording();
+
   state.history = [];
-  state.isProcessing = false;
   clearChatStream();
-  setControlState('idle');
+  setState('idle');
   showToast('Started a new conversation.');
 }
 
 /**
- * Initializes the application
+ * Initializes listeners and lifecycle events
  */
 function init() {
   initDialog();
 
-  // Handle example question chips
+  // Mic button
+  if (elements.btnMic) {
+    elements.btnMic.addEventListener('click', handleMicClick);
+  }
+
+  // Stop button
+  if (elements.btnStop) {
+    elements.btnStop.addEventListener('click', () => {
+      stopPlayback();
+      setState('idle');
+    });
+  }
+
+  // Example question chips
   if (elements.chipsContainer) {
     elements.chipsContainer.addEventListener('click', (e) => {
       const chip = e.target.closest('.chip');
@@ -100,7 +252,7 @@ function init() {
     });
   }
 
-  // Handle typing form submission
+  // Typing form submission
   if (elements.chatForm) {
     elements.chatForm.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -108,20 +260,25 @@ function init() {
     });
   }
 
-  // Handle reset button
+  // New conversation button
   if (elements.btnReset) {
     elements.btnReset.addEventListener('click', resetConversation);
   }
 
-  // Mic button in Prompt 5 (wires state transitions; full voice loop connects in Prompt 6)
-  if (elements.btnMic) {
-    elements.btnMic.addEventListener('click', () => {
-      if (state.isProcessing) return;
-      showToast('Voice recording is activating. You can also type or tap chips anytime.');
-    });
-  }
+  // Stop audio playback if tab becomes hidden
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      stopPlayback();
+      if (isRecording()) {
+        stopRecording();
+      }
+      if (state.currentState !== 'thinking') {
+        setState('idle');
+      }
+    }
+  });
 
-  console.log('Ask Bhushan voice app initialized.');
+  console.log('Ask Bhushan voice app initialized with full voice in/out & fallbacks.');
 }
 
 document.addEventListener('DOMContentLoaded', init);
