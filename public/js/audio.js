@@ -481,8 +481,55 @@ export async function playAudioBuffer(audioBuffer, onTimeUpdate, onEnded) {
 
 let cachedDeviceVoice = null;
 
+// Verified list of young/natural male voice names across macOS, Windows, Chrome & Android
+const VERIFIED_MALE_NAMES = [
+  'aman', 'rishi', 'eddy', 'reed', 'rocko', 'daniel', 'alex', 'fred',
+  'ryan', 'guy', 'christopher', 'arthur', 'oliver', 'evan', 'aaron', 'george', 'albert', 'ralph'
+];
+
+// Strict blacklist of female voices so they are NEVER selected
+const FEMALE_VOICE_NAMES = [
+  'samantha', 'victoria', 'karen', 'kathy', 'moira', 'tessa', 'tara',
+  'flo', 'shelley', 'sandy', 'grandma', 'zira', 'jenny', 'aria', 'sonia',
+  'neerja', 'swara', 'veena', 'lekha', 'female', 'woman'
+];
+
 /**
- * Pre-caches the device voice so it stays 100% consistent across every question
+ * Finds the best verified young male voice, strictly avoiding female voices
+ */
+function getVerifiedMaleVoice(voices) {
+  if (!voices || voices.length === 0) return null;
+
+  // 1. Highest priority: Verified young male voice names in English
+  for (const name of VERIFIED_MALE_NAMES) {
+    const found = voices.find(v =>
+      v.lang.startsWith('en') &&
+      v.name.toLowerCase().includes(name) &&
+      !FEMALE_VOICE_NAMES.some(f => v.name.toLowerCase().includes(f))
+    );
+    if (found) return found;
+  }
+
+  // 2. Second priority: Any voice with 'male' in name or metadata that is not female
+  const maleTagged = voices.find(v =>
+    v.lang.startsWith('en') &&
+    (v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('guy')) &&
+    !FEMALE_VOICE_NAMES.some(f => v.name.toLowerCase().includes(f))
+  );
+  if (maleTagged) return maleTagged;
+
+  // 3. Third priority: Any English voice that is strictly NOT female
+  const notFemale = voices.find(v =>
+    v.lang.startsWith('en') &&
+    !FEMALE_VOICE_NAMES.some(f => v.name.toLowerCase().includes(f))
+  );
+  if (notFemale) return notFemale;
+
+  return voices[0] || null;
+}
+
+/**
+ * Pre-caches the verified young male voice so it stays 100% consistent across every question
  */
 export function initDeviceVoices() {
   if (typeof window === 'undefined' || !window.speechSynthesis) return;
@@ -490,21 +537,7 @@ export function initDeviceVoices() {
   const selectVoice = () => {
     const voices = window.speechSynthesis.getVoices();
     if (!voices || voices.length === 0) return;
-
-    cachedDeviceVoice = voices.find(v =>
-      v.lang.startsWith('en') &&
-      (v.name.includes('Natural') || v.name.includes('Online') || v.name.includes('Enhanced') || v.name.includes('Premium')) &&
-      (v.name.includes('Male') || v.name.includes('Ryan') || v.name.includes('Guy') || v.name.includes('Christopher') || v.name.includes('Daniel') || v.name.includes('Oliver') || v.name.includes('Alex'))
-    ) || voices.find(v =>
-      v.lang.startsWith('en') &&
-      (v.name.includes('Male') || v.name.includes('Ryan') || v.name.includes('Alex') ||
-       v.name.includes('Daniel') || v.name.includes('Oliver') || v.name.includes('Evan') ||
-       v.name.includes('Fred') || v.name.includes('George') || v.name.includes('Guy') ||
-       v.name.includes('Arthur') || v.name.includes('Aaron') || v.name.includes('Rishi'))
-    ) || voices.find(v => v.lang.startsWith('en-IN')) ||
-         voices.find(v => v.lang.startsWith('en-GB')) ||
-         voices.find(v => v.lang.startsWith('en-US')) ||
-         voices.find(v => v.lang.startsWith('en')) || null;
+    cachedDeviceVoice = getVerifiedMaleVoice(voices);
   };
 
   selectVoice();
@@ -514,8 +547,7 @@ export function initDeviceVoices() {
 }
 
 /**
- * Browser SpeechSynthesis fallback with young male voice profile and word-boundary sync.
- * Strictly preserves single voice across questions without switching.
+ * Browser SpeechSynthesis fallback with strictly verified young male voice profile
  */
 export function speakWithDeviceVoice(text, onWordBoundary, onEnded) {
   stopPlayback();
@@ -530,22 +562,7 @@ export function speakWithDeviceVoice(text, onWordBoundary, onEnded) {
 
   if (!cachedDeviceVoice) {
     const voices = window.speechSynthesis.getVoices();
-    if (voices && voices.length > 0) {
-      cachedDeviceVoice = voices.find(v =>
-        v.lang.startsWith('en') &&
-        (v.name.includes('Natural') || v.name.includes('Online') || v.name.includes('Enhanced') || v.name.includes('Premium')) &&
-        (v.name.includes('Male') || v.name.includes('Ryan') || v.name.includes('Guy') || v.name.includes('Christopher') || v.name.includes('Daniel') || v.name.includes('Oliver') || v.name.includes('Alex'))
-      ) || voices.find(v =>
-        v.lang.startsWith('en') &&
-        (v.name.includes('Male') || v.name.includes('Ryan') || v.name.includes('Alex') ||
-         v.name.includes('Daniel') || v.name.includes('Oliver') || v.name.includes('Evan') ||
-         v.name.includes('Fred') || v.name.includes('George') || v.name.includes('Guy') ||
-         v.name.includes('Arthur') || v.name.includes('Aaron') || v.name.includes('Rishi'))
-      ) || voices.find(v => v.lang.startsWith('en-IN')) ||
-           voices.find(v => v.lang.startsWith('en-GB')) ||
-           voices.find(v => v.lang.startsWith('en-US')) ||
-           voices.find(v => v.lang.startsWith('en')) || null;
-    }
+    cachedDeviceVoice = getVerifiedMaleVoice(voices);
   }
 
   if (cachedDeviceVoice) {

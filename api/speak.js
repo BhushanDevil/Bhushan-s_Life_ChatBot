@@ -58,85 +58,96 @@ export default async function handler(req, res) {
     });
   }
 
-  const ttsModel = process.env.GEMINI_TTS_MODEL || 'gemini-2.5-flash-preview-tts';
+  const primaryTtsModel = process.env.GEMINI_TTS_MODEL || 'gemini-3.1-flash-tts-preview';
+  const candidateModels = [
+    primaryTtsModel,
+    'gemini-3.8-flash-lite-tts',
+    'gemini-3.8-flash-tts',
+    'gemini-2.5-flash-preview-tts'
+  ];
+  // Remove duplicates
+  const ttsModels = Array.from(new Set(candidateModels));
+
   const voiceName = voice || process.env.TTS_VOICE || 'Puck'; // User chosen voice or server default
 
   // Prompt instructing natural, expressive, youthful conversational delivery
-  const promptText = `Speak naturally as Bhushan in a warm, expressive, spontaneous young male voice with realistic conversational intonation, natural pitch variations, and engaging pacing without sounding robotic or formal:\n\n${text}`;
+  const promptText = `Say in a warm, natural, spontaneous young male voice as Bhushan. Use realistic conversational intonation, natural dynamic pitch, lively pacing, and clean expressive articulation:\n\n${text}`;
 
-  try {
-    const url = `${GEMINI_API_BASE}/${encodeURIComponent(ttsModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  let lastError = null;
 
-    const requestBody = {
-      contents: [
-        {
-          parts: [{ text: promptText }]
-        }
-      ],
-      generationConfig: {
-        responseModalities: ['AUDIO'],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: {
-              voiceName
+  for (const ttsModel of ttsModels) {
+    try {
+      const url = `${GEMINI_API_BASE}/${encodeURIComponent(ttsModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+      const requestBody = {
+        contents: [
+          {
+            parts: [{ text: promptText }]
+          }
+        ],
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName
+              }
             }
           }
         }
-      }
-    };
+      };
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody)
-    });
-
-    if (!response.ok) {
-      const errText = await response.text().catch(() => '');
-      console.warn(`[api/speak] TTS model ${ttsModel} returned HTTP ${response.status}:`, errText);
-      return res.status(503).json({
-        error: {
-          code: 'TTS_UNAVAILABLE',
-          message: 'Upstream TTS service returned an error. Falling back to device voice.'
-        }
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+        signal: AbortSignal.timeout(6000)
       });
-    }
 
-    const data = await response.json();
-    const inlineData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-
-    if (!inlineData?.data) {
-      console.warn('[api/speak] No inline audio data returned by TTS model.');
-      return res.status(503).json({
-        error: {
-          code: 'TTS_FAILED',
-          message: 'No audio returned by AI model. Falling back to device voice.'
-        }
-      });
-    }
-
-    // Extract sample rate from mimeType if provided (e.g. "audio/pcm;rate=24000")
-    let sampleRate = 24000;
-    const rateMatch = (inlineData.mimeType || '').match(/rate=(\d+)/);
-    if (rateMatch && rateMatch[1]) {
-      sampleRate = parseInt(rateMatch[1], 10);
-    }
-
-    const rawBuffer = Buffer.from(inlineData.data, 'base64');
-    const wavBuffer = pcmToWav(rawBuffer, sampleRate);
-
-    return res.status(200).json({
-      audio: wavBuffer.toString('base64'),
-      mimeType: 'audio/wav',
-      sampleRate
-    });
-  } catch (err) {
-    console.error('[api/speak] Exception during TTS generation:', err.message);
-    return res.status(503).json({
-      error: {
-        code: 'TTS_UNAVAILABLE',
-        message: 'TTS generation failed. Falling back to device voice.'
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '');
+        console.warn(`[api/speak] TTS model ${ttsModel} returned HTTP ${response.status}:`, errText.slice(0, 160));
+        lastError = new Error(`TTS model ${ttsModel} HTTP ${response.status}`);
+        continue; // Try next model in candidate list
       }
-    });
+
+      const data = await response.json();
+      const inlineData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+
+      if (!inlineData?.data) {
+        console.warn(`[api/speak] No inline audio data returned by ${ttsModel}.`);
+        lastError = new Error(`No audio data from ${ttsModel}`);
+        continue;
+      }
+
+      // Extract sample rate from mimeType if provided (e.g. "audio/pcm;rate=24000")
+      let sampleRate = 24000;
+      const rateMatch = (inlineData.mimeType || '').match(/rate=(\d+)/);
+      if (rateMatch && rateMatch[1]) {
+        sampleRate = parseInt(rateMatch[1], 10);
+      }
+
+      const rawBuffer = Buffer.from(inlineData.data, 'base64');
+      const wavBuffer = pcmToWav(rawBuffer, sampleRate);
+
+      return res.status(200).json({
+        audio: wavBuffer.toString('base64'),
+        mimeType: 'audio/wav',
+        sampleRate,
+        modelUsed: ttsModel,
+        voice: voiceName
+      });
+    } catch (err) {
+      console.warn(`[api/speak] Error with model ${ttsModel}:`, err.message);
+      lastError = err;
+    }
   }
+
+  // All Gemini TTS candidate models failed/exhausted
+  return res.status(503).json({
+    error: {
+      code: 'TTS_UNAVAILABLE',
+      message: `Gemini TTS service unavailable (${lastError?.message || 'quota exceeded'}). Falling back to device voice.`
+    }
+  });
 }
