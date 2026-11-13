@@ -14,6 +14,7 @@ import {
   showToast,
   initDialog,
   initThemeToggle,
+  updateVoiceIndicator,
   toggleSidebar,
   closeSidebar,
   renderSidebarHistory,
@@ -31,6 +32,7 @@ import {
   computeWordTimings,
   playWavBase64,
   playAudioBuffer,
+  initDeviceVoices,
   speakWithDeviceVoice,
   stopPlayback,
   tryBrowserSpeechRecognition
@@ -53,7 +55,8 @@ const state = {
   currentState: 'idle', // 'idle' | 'listening' | 'thinking' | 'speaking'
   cachedChips: [], // Cached { question, answer, audioUrl }
   currentStreamer: null, // Active synchronized streaming message controller
-  searchQuery: ''
+  searchQuery: '',
+  selectedVoice: 'Puck' // 'Puck' | 'Charon' | 'Fenrir' | 'Aoede' | 'Kore' | 'device'
 };
 
 /**
@@ -203,8 +206,35 @@ async function speakAnswer(answerText, words, streamer) {
 
   setState('speaking');
 
+  // If user selected Device Voice, use 100% free offline speech directly (0 Gemini API cost/quota)
+  if (state.selectedVoice === 'device') {
+    const estimatedDuration = Math.max(1, words.length * 0.38);
+    computeWordTimings(words, estimatedDuration);
+
+    speakWithDeviceVoice(
+      answerText,
+      (charIndex) => {
+        let currentChars = 0;
+        for (let i = 0; i < words.length; i++) {
+          if (currentChars >= charIndex || i === words.length - 1) {
+            if (streamer) streamer.updateSpokenWord(words[i].startTime + 0.01, estimatedDuration);
+            break;
+          }
+          currentChars += words[i].rawText.length + 1;
+        }
+      },
+      () => {
+        if (streamer) streamer.completeStreaming();
+        state.currentStreamer = null;
+        setState('idle');
+      }
+    );
+    return;
+  }
+
+  // Otherwise synthesize using selected free Gemini voice (Puck, Charon, Fenrir, Aoede, Kore)
   try {
-    const ttsRes = await requestSpeech(answerText);
+    const ttsRes = await requestSpeech(answerText, state.selectedVoice);
 
     if (ttsRes.ok && ttsRes.audio) {
       let timingsComputed = false;
@@ -354,8 +384,8 @@ async function handleChipOrText(questionText) {
     refreshSidebar();
     refreshRecommendations();
 
-    // Play cached WAV audio immediately
-    if (cached.audioUrl) {
+    // Play cached WAV audio immediately ONLY if selected voice is Puck (pre-rendered voice)
+    if (state.selectedVoice === 'Puck' && cached.audioUrl) {
       setState('speaking');
       try {
         const audioRes = await fetch(cached.audioUrl);
@@ -381,7 +411,7 @@ async function handleChipOrText(questionText) {
       }
     }
 
-    // Fallback if cached WAV fetch fails
+    // If another voice was chosen (Charon, Fenrir, Aoede, Kore, or Device Voice), synthesize in that voice
     await speakAnswer(cached.answer, words, streamer);
     return;
   }
@@ -473,7 +503,34 @@ async function handleMicClick() {
 function init() {
   initDialog();
   initThemeToggle();
+  initDeviceVoices();
   loadChipsCache();
+
+  // Load and apply selected voice (persisted across sessions)
+  try {
+    const savedVoice = localStorage.getItem('bhushan_selected_voice');
+    if (savedVoice) {
+      state.selectedVoice = savedVoice;
+    }
+  } catch (e) {}
+  updateVoiceIndicator(state.selectedVoice);
+
+  if (elements.voiceSelect) {
+    elements.voiceSelect.addEventListener('change', (e) => {
+      const newVoice = e.target.value;
+      state.selectedVoice = newVoice;
+      try {
+        localStorage.setItem('bhushan_selected_voice', newVoice);
+      } catch (err) {}
+      updateVoiceIndicator(newVoice);
+
+      if (newVoice === 'device') {
+        showToast('Voice set to Device Voice (Zero API cost / Instant).');
+      } else {
+        showToast(`Voice set to ${newVoice} (Free Gemini Voice).`);
+      }
+    });
+  }
 
   // Load active chat session
   const activeChat = getActiveChat();

@@ -52,6 +52,10 @@
       </div>
 
       <div class="sidebar-footer">
+        <div class="sidebar-voice-indicator">
+          <span class="sidebar-voice-label">Voice:</span>
+          <span id="sidebar-active-voice-name" class="sidebar-voice-name">Puck (Young Male)</span>
+        </div>
         <button id="btn-open-for-you-sidebar" class="btn-sidebar-footer">
           <span>✨</span>
           <span>For You Recommendations</span>
@@ -85,6 +89,26 @@
         </div>
 
         <div class="header-right">
+          <!-- Voice Selector (All Free Options) -->
+          <div class="voice-picker" title="Choose Voice (100% Free of Cost)">
+            <svg class="voice-picker-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            </svg>
+            <select id="voice-select" class="voice-select" aria-label="Select voice personality">
+              <optgroup label="Gemini AI Free Voices">
+                <option value="Puck" selected>Puck (Young Male — Default)</option>
+                <option value="Charon">Charon (Deep Male)</option>
+                <option value="Fenrir">Fenrir (Confident Male)</option>
+                <option value="Aoede">Aoede (Warm Expressive)</option>
+                <option value="Kore">Kore (Clear Bright)</option>
+              </optgroup>
+              <optgroup label="Zero-Cost Native Voice">
+                <option value="device">Device Voice (0 API Cost / Fast)</option>
+              </optgroup>
+            </select>
+          </div>
+
           <button id="btn-for-you-header" class="btn-pill highlight" aria-label="Open personalized For You recommendations">
             <span>✨</span>
             <span>For You</span>

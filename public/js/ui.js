@@ -28,6 +28,7 @@ export const elements = {
   btnMenuToggle: document.getElementById('btn-menu-toggle'),
   btnThemeToggle: document.getElementById('btn-theme-toggle'),
   btnForYouHeader: document.getElementById('btn-for-you-header'),
+  voiceSelect: document.getElementById('voice-select'),
 
   // Sidebar elements
   chatSidebar: document.getElementById('chat-sidebar'),
@@ -36,6 +37,7 @@ export const elements = {
   btnNewChatSidebar: document.getElementById('btn-new-chat-sidebar'),
   sidebarSearch: document.getElementById('sidebar-search'),
   sidebarHistoryList: document.getElementById('sidebar-history-list'),
+  sidebarActiveVoiceName: document.getElementById('sidebar-active-voice-name'),
   btnOpenForYouSidebar: document.getElementById('btn-open-for-you-sidebar'),
   btnClearAllChats: document.getElementById('btn-clear-all-chats'),
 
@@ -100,6 +102,28 @@ export function initThemeToggle() {
     } catch (e) {}
     updateIcon(next);
   });
+}
+
+/**
+ * Updates the voice indicator display across UI controls
+ * @param {string} voiceName
+ */
+export function updateVoiceIndicator(voiceName) {
+  const { voiceSelect, sidebarActiveVoiceName } = elements;
+  if (voiceSelect && voiceSelect.value !== voiceName) {
+    voiceSelect.value = voiceName;
+  }
+  if (sidebarActiveVoiceName) {
+    const labels = {
+      Puck: 'Puck (Young Male)',
+      Charon: 'Charon (Deep Male)',
+      Fenrir: 'Fenrir (Confident Male)',
+      Aoede: 'Aoede (Warm Expressive)',
+      Kore: 'Kore (Clear Bright)',
+      device: 'Device Voice (Free / Fast)'
+    };
+    sidebarActiveVoiceName.textContent = labels[voiceName] || voiceName;
+  }
 }
 
 /**

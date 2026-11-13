@@ -437,6 +437,68 @@ button:focus-visible, input:focus-visible {
   gap: 0.5rem;
 }
 
+/* Voice Picker */
+.voice-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  padding: 0 0.65rem 0 0.6rem;
+  min-height: 36px;
+  transition: all var(--transition-fast);
+}
+
+.voice-picker:hover, .voice-picker:focus-within {
+  border-color: var(--accent-primary);
+  background-color: var(--accent-subtle);
+}
+
+.voice-picker-icon {
+  color: var(--accent-primary);
+  flex-shrink: 0;
+}
+
+.voice-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 0.35rem 0.85rem 0.35rem 0;
+  outline: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right center;
+  background-size: 12px;
+}
+
+.voice-select option, .voice-select optgroup {
+  background-color: var(--bg-surface-elevated);
+  color: var(--text-primary);
+}
+
+.sidebar-voice-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-sidebar-muted);
+  background-color: rgba(255, 255, 255, 0.04);
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.25rem;
+}
+
+.sidebar-voice-name {
+  font-weight: 600;
+  color: var(--accent-primary);
+}
+
 .btn-pill {
   min-height: 36px;
   padding: 0.35rem 0.85rem;

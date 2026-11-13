@@ -53,15 +53,22 @@ export async function sendChatMessage({ text, audio, history = [] }) {
 
 /**
  * Requests speech audio for an answer text from /api/speak
+ * @param {string} text
+ * @param {string} [voice] - Prebuilt free Gemini voice (e.g. Puck, Charon, Fenrir)
  */
-export async function requestSpeech(text) {
+export async function requestSpeech(text, voice = null) {
   try {
+    const payload = { text };
+    if (voice && voice !== 'device') {
+      payload.voice = voice;
+    }
+
     const response = await fetch('/api/speak', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ text })
+      body: JSON.stringify(payload)
     });
 
     const data = await response.json();

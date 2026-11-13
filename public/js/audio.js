@@ -401,8 +401,38 @@ export async function playAudioBuffer(audioBuffer, onTimeUpdate, onEnded) {
   return duration;
 }
 
+let cachedDeviceVoice = null;
+
 /**
- * Browser SpeechSynthesis fallback with young male voice profile and word-boundary sync
+ * Pre-caches the device voice so it stays 100% consistent across every question
+ */
+export function initDeviceVoices() {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return;
+
+  const selectVoice = () => {
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices || voices.length === 0) return;
+
+    cachedDeviceVoice = voices.find(v =>
+      v.lang.startsWith('en') &&
+      (v.name.includes('Male') || v.name.includes('Ryan') || v.name.includes('Alex') ||
+       v.name.includes('Daniel') || v.name.includes('Fred') || v.name.includes('Oliver') ||
+       v.name.includes('George') || v.name.includes('Guy'))
+    ) || voices.find(v => v.lang.startsWith('en-IN')) ||
+         voices.find(v => v.lang.startsWith('en-GB')) ||
+         voices.find(v => v.lang.startsWith('en-US')) ||
+         voices.find(v => v.lang.startsWith('en')) || null;
+  };
+
+  selectVoice();
+  if (window.speechSynthesis.onvoiceschanged !== undefined) {
+    window.speechSynthesis.onvoiceschanged = selectVoice;
+  }
+}
+
+/**
+ * Browser SpeechSynthesis fallback with young male voice profile and word-boundary sync.
+ * Strictly preserves single voice across questions without switching.
  */
 export function speakWithDeviceVoice(text, onWordBoundary, onEnded) {
   stopPlayback();
@@ -415,20 +445,23 @@ export function speakWithDeviceVoice(text, onWordBoundary, onEnded) {
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
 
-  // Filter for natural young male English voices
-  const voices = window.speechSynthesis.getVoices();
-  const youngMaleVoice = voices.find(v =>
-    v.lang.startsWith('en') &&
-    (v.name.includes('Male') || v.name.includes('Ryan') || v.name.includes('Alex') ||
-     v.name.includes('Daniel') || v.name.includes('Fred') || v.name.includes('Oliver') ||
-     v.name.includes('George') || v.name.includes('Guy'))
-  ) || voices.find(v => v.lang.startsWith('en-IN')) ||
-       voices.find(v => v.lang.startsWith('en-GB')) ||
-       voices.find(v => v.lang.startsWith('en-US')) ||
-       voices.find(v => v.lang.startsWith('en'));
+  if (!cachedDeviceVoice) {
+    const voices = window.speechSynthesis.getVoices();
+    if (voices && voices.length > 0) {
+      cachedDeviceVoice = voices.find(v =>
+        v.lang.startsWith('en') &&
+        (v.name.includes('Male') || v.name.includes('Ryan') || v.name.includes('Alex') ||
+         v.name.includes('Daniel') || v.name.includes('Fred') || v.name.includes('Oliver') ||
+         v.name.includes('George') || v.name.includes('Guy'))
+      ) || voices.find(v => v.lang.startsWith('en-IN')) ||
+           voices.find(v => v.lang.startsWith('en-GB')) ||
+           voices.find(v => v.lang.startsWith('en-US')) ||
+           voices.find(v => v.lang.startsWith('en')) || null;
+    }
+  }
 
-  if (youngMaleVoice) {
-    utterance.voice = youngMaleVoice;
+  if (cachedDeviceVoice) {
+    utterance.voice = cachedDeviceVoice;
   }
 
   // Set youthful, conversational male cadence
