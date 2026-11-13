@@ -61,8 +61,8 @@ export default async function handler(req, res) {
   const ttsModel = process.env.GEMINI_TTS_MODEL || 'gemini-2.5-flash-preview-tts';
   const voiceName = voice || process.env.TTS_VOICE || 'Puck'; // User chosen voice or server default
 
-  // CRITICAL: Fixed single instruction so the voice model maintains a strictly consistent identity across all questions
-  const promptText = `Speak the following response naturally in a warm, friendly, calm conversational tone as Bhushan:\n\n${text}`;
+  // Prompt instructing natural, expressive, youthful conversational delivery
+  const promptText = `Speak naturally as Bhushan in a warm, expressive, spontaneous young male voice with realistic conversational intonation, natural pitch variations, and engaging pacing without sounding robotic or formal:\n\n${text}`;
 
   try {
     const url = `${GEMINI_API_BASE}/${encodeURIComponent(ttsModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;

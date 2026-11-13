@@ -234,7 +234,12 @@ async function speakAnswer(answerText, words, streamer) {
 
   // Otherwise synthesize using selected free Gemini voice (Puck, Charon, Fenrir, Aoede, Kore)
   try {
-    const ttsRes = await requestSpeech(answerText, state.selectedVoice);
+    const ttsPromise = requestSpeech(answerText, state.selectedVoice);
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('TTS_TIMEOUT')), 3500)
+    );
+
+    const ttsRes = await Promise.race([ttsPromise, timeoutPromise]);
 
     if (ttsRes.ok && ttsRes.audio) {
       let timingsComputed = false;
@@ -256,7 +261,7 @@ async function speakAnswer(answerText, words, streamer) {
       return;
     }
   } catch (err) {
-    console.warn('Gemini TTS failed, engaging device voice fallback:', err);
+    console.warn('Gemini TTS slow or unavailable, engaging instant device voice fallback:', err.message);
   }
 
   // Graceful fallback to device voice with word-boundary synchronization
@@ -460,7 +465,13 @@ async function handleMicClick() {
 
   try {
     const recordingPromise = startRecording({
-      onTick: (seconds) => updateTimerDisplay(seconds)
+      onTick: (seconds) => updateTimerDisplay(seconds),
+      onVoiceActivity: () => {
+        elements.statusText.textContent = 'Listening to your question...';
+      },
+      onAutoStop: () => {
+        elements.statusText.textContent = 'Finished speaking, answering...';
+      }
     });
 
     const wavBase64 = await recordingPromise;

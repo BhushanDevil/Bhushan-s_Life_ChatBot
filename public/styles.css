@@ -1196,3 +1196,167 @@ button:focus-visible, input:focus-visible {
     margin-right: -280px;
   }
 }
+
+/* ==========================================================================
+   Mobile-First Layout Optimization (< 680px)
+   ========================================================================== */
+@media (max-width: 680px) {
+  .app-header {
+    padding: 0.45rem 0.65rem;
+    gap: 0.4rem;
+    min-height: 50px;
+  }
+
+  .header-left {
+    gap: 0.45rem;
+  }
+
+  .btn-menu-toggle {
+    min-width: 34px;
+    min-height: 34px;
+    padding: 6px;
+  }
+
+  .title-group h1 {
+    font-size: 1.0rem;
+    white-space: nowrap;
+  }
+
+  .title-group .subtitle {
+    display: none; /* Hide subtitle on mobile to preserve single-line compact header */
+  }
+
+  .header-right {
+    gap: 0.35rem;
+  }
+
+  .voice-picker {
+    padding: 0 0.45rem 0 0.45rem;
+    min-height: 32px;
+    max-width: 108px;
+  }
+
+  .voice-picker-icon {
+    width: 14px;
+    height: 14px;
+  }
+
+  .voice-select {
+    font-size: 0.72rem;
+    max-width: 80px;
+    padding: 0.2rem 0.65rem 0.2rem 0;
+    background-size: 10px;
+  }
+
+  .btn-pill {
+    min-height: 32px;
+    padding: 0.25rem 0.55rem;
+    font-size: 0.75rem;
+  }
+
+  .pill-label {
+    display: none; /* Show icon only (✨) on mobile to save header space */
+  }
+
+  .btn-icon {
+    min-width: 32px;
+    min-height: 32px;
+  }
+
+  .btn-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .ai-banner {
+    padding: 0.3rem 0.65rem;
+    font-size: 0.72rem;
+  }
+
+  .banner-badge {
+    font-size: 0.6rem;
+    padding: 0.1rem 0.3rem;
+  }
+
+  .chips-section {
+    padding: 0.35rem 0.65rem;
+  }
+
+  .chips-container {
+    gap: 0.4rem;
+    padding-bottom: 2px;
+  }
+
+  .chip {
+    min-height: 30px;
+    padding: 0.25rem 0.65rem;
+    font-size: 0.75rem;
+  }
+
+  .chat-main {
+    padding: 0.75rem 0.65rem;
+    gap: 0.85rem;
+  }
+
+  .chat-bubble {
+    padding: 0.75rem 0.95rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  .app-controls {
+    padding: 0.45rem 0.65rem 0.75rem;
+    gap: 0.45rem;
+  }
+
+  .btn-mic {
+    width: 52px;
+    height: 52px;
+  }
+
+  .btn-mic .mic-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .status-indicator {
+    font-size: 0.75rem;
+    margin-bottom: 0.1rem;
+  }
+
+  .chat-input {
+    min-height: 38px;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.85rem;
+  }
+
+  .btn-send {
+    width: 34px;
+    height: 34px;
+  }
+
+  .btn-send svg {
+    width: 15px;
+    height: 15px;
+  }
+}
+
+/* Extra Small Mobile (< 380px) */
+@media (max-width: 380px) {
+  .app-header {
+    padding: 0.35rem 0.5rem;
+  }
+
+  .title-group h1 {
+    font-size: 0.9rem;
+  }
+
+  .voice-picker {
+    max-width: 85px;
+  }
+
+  .voice-select {
+    max-width: 60px;
+    font-size: 0.68rem;
+  }
+}

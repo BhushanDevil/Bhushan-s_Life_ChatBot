@@ -12,6 +12,9 @@ let recordingTimer = null;
 let recordingSeconds = 0;
 let speakAbortController = null;
 let syncAnimFrame = null;
+let vadAnimFrame = null;
+let vadSourceNode = null;
+let vadAnalyser = null;
 
 // Important keywords for progressive emphasis
 const KEYWORDS = [
@@ -220,10 +223,15 @@ export async function convertBlobToMono16kWav(blob) {
 }
 
 /**
- * Starts recording user voice
+ * Starts recording user voice with real-time Voice Activity Detection (VAD)
+ * that automatically detects when speaking finishes and stops recording.
+ * @param {Object} options
+ * @param {Function} [options.onTick] - Called every second with recording duration
+ * @param {Function} [options.onVoiceActivity] - Called when user speech begins
+ * @param {Function} [options.onAutoStop] - Called when silence triggers automatic stop
  */
-export async function startRecording({ onTick }) {
-  unlockAudioContext();
+export async function startRecording({ onTick, onVoiceActivity, onAutoStop } = {}) {
+  const ctx = unlockAudioContext();
 
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     throw new Error('MEDIA_NOT_SUPPORTED');
@@ -260,8 +268,73 @@ export async function startRecording({ onTick }) {
     }
   }, 1000);
 
+  // Setup Real-Time Voice Activity Detection (VAD)
+  let speechDetected = false;
+  let silenceStartTime = null;
+  const SILENCE_THRESHOLD_MS = 1300; // 1.3 seconds of silence after speaking triggers auto-finish
+  const NOISE_FLOOR = 15; // Average frequency volume threshold
+
+  try {
+    vadSourceNode = ctx.createMediaStreamSource(stream);
+    vadAnalyser = ctx.createAnalyser();
+    vadAnalyser.fftSize = 512;
+    vadSourceNode.connect(vadAnalyser);
+
+    const freqData = new Uint8Array(vadAnalyser.frequencyBinCount);
+
+    const checkVolume = () => {
+      if (!currentMediaRecorder || currentMediaRecorder.state !== 'recording') {
+        return;
+      }
+
+      vadAnalyser.getByteFrequencyData(freqData);
+      let sum = 0;
+      for (let i = 0; i < freqData.length; i++) {
+        sum += freqData[i];
+      }
+      const avgVolume = sum / freqData.length;
+
+      const now = Date.now();
+      if (avgVolume > NOISE_FLOOR) {
+        if (!speechDetected) {
+          speechDetected = true;
+          if (onVoiceActivity) onVoiceActivity(true);
+        }
+        silenceStartTime = null;
+      } else if (speechDetected) {
+        if (silenceStartTime === null) {
+          silenceStartTime = now;
+        } else if (now - silenceStartTime >= SILENCE_THRESHOLD_MS) {
+          // Automatic silence detected after speech!
+          if (onAutoStop) onAutoStop();
+          stopRecording();
+          return;
+        }
+      }
+
+      vadAnimFrame = requestAnimationFrame(checkVolume);
+    };
+
+    vadAnimFrame = requestAnimationFrame(checkVolume);
+  } catch (vadErr) {
+    console.warn('VAD setup skipped, manual stop remains fully active:', vadErr);
+  }
+
   return new Promise((resolve, reject) => {
     recorder.onstop = async () => {
+      if (vadAnimFrame) {
+        cancelAnimationFrame(vadAnimFrame);
+        vadAnimFrame = null;
+      }
+      if (vadSourceNode) {
+        try { vadSourceNode.disconnect(); } catch (e) {}
+        vadSourceNode = null;
+      }
+      if (vadAnalyser) {
+        try { vadAnalyser.disconnect(); } catch (e) {}
+        vadAnalyser = null;
+      }
+
       clearInterval(recordingTimer);
       recordingTimer = null;
 
@@ -279,6 +352,7 @@ export async function startRecording({ onTick }) {
     };
 
     recorder.onerror = (e) => {
+      if (vadAnimFrame) cancelAnimationFrame(vadAnimFrame);
       clearInterval(recordingTimer);
       reject(e.error || new Error('RECORDING_FAILED'));
     };
@@ -291,6 +365,10 @@ export async function startRecording({ onTick }) {
  * Stops an active recording
  */
 export function stopRecording() {
+  if (vadAnimFrame) {
+    cancelAnimationFrame(vadAnimFrame);
+    vadAnimFrame = null;
+  }
   if (currentMediaRecorder && currentMediaRecorder.state !== 'inactive') {
     currentMediaRecorder.stop();
   }
@@ -415,9 +493,14 @@ export function initDeviceVoices() {
 
     cachedDeviceVoice = voices.find(v =>
       v.lang.startsWith('en') &&
+      (v.name.includes('Natural') || v.name.includes('Online') || v.name.includes('Enhanced') || v.name.includes('Premium')) &&
+      (v.name.includes('Male') || v.name.includes('Ryan') || v.name.includes('Guy') || v.name.includes('Christopher') || v.name.includes('Daniel') || v.name.includes('Oliver') || v.name.includes('Alex'))
+    ) || voices.find(v =>
+      v.lang.startsWith('en') &&
       (v.name.includes('Male') || v.name.includes('Ryan') || v.name.includes('Alex') ||
-       v.name.includes('Daniel') || v.name.includes('Fred') || v.name.includes('Oliver') ||
-       v.name.includes('George') || v.name.includes('Guy'))
+       v.name.includes('Daniel') || v.name.includes('Oliver') || v.name.includes('Evan') ||
+       v.name.includes('Fred') || v.name.includes('George') || v.name.includes('Guy') ||
+       v.name.includes('Arthur') || v.name.includes('Aaron') || v.name.includes('Rishi'))
     ) || voices.find(v => v.lang.startsWith('en-IN')) ||
          voices.find(v => v.lang.startsWith('en-GB')) ||
          voices.find(v => v.lang.startsWith('en-US')) ||
@@ -450,9 +533,14 @@ export function speakWithDeviceVoice(text, onWordBoundary, onEnded) {
     if (voices && voices.length > 0) {
       cachedDeviceVoice = voices.find(v =>
         v.lang.startsWith('en') &&
+        (v.name.includes('Natural') || v.name.includes('Online') || v.name.includes('Enhanced') || v.name.includes('Premium')) &&
+        (v.name.includes('Male') || v.name.includes('Ryan') || v.name.includes('Guy') || v.name.includes('Christopher') || v.name.includes('Daniel') || v.name.includes('Oliver') || v.name.includes('Alex'))
+      ) || voices.find(v =>
+        v.lang.startsWith('en') &&
         (v.name.includes('Male') || v.name.includes('Ryan') || v.name.includes('Alex') ||
-         v.name.includes('Daniel') || v.name.includes('Fred') || v.name.includes('Oliver') ||
-         v.name.includes('George') || v.name.includes('Guy'))
+         v.name.includes('Daniel') || v.name.includes('Oliver') || v.name.includes('Evan') ||
+         v.name.includes('Fred') || v.name.includes('George') || v.name.includes('Guy') ||
+         v.name.includes('Arthur') || v.name.includes('Aaron') || v.name.includes('Rishi'))
       ) || voices.find(v => v.lang.startsWith('en-IN')) ||
            voices.find(v => v.lang.startsWith('en-GB')) ||
            voices.find(v => v.lang.startsWith('en-US')) ||
@@ -464,9 +552,9 @@ export function speakWithDeviceVoice(text, onWordBoundary, onEnded) {
     utterance.voice = cachedDeviceVoice;
   }
 
-  // Set youthful, conversational male cadence
-  utterance.pitch = 1.05; // Slightly higher pitch for young adult tone
-  utterance.rate = 1.0;
+  // Set crisp, natural conversational cadence with human pacing
+  utterance.pitch = 1.0;
+  utterance.rate = 1.02;
 
   // Real-time word boundary synchronization
   utterance.onboundary = (e) => {
