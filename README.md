@@ -1,66 +1,105 @@
-# Bhushan's Life Voice Bot
+# Ask Bhushan — AI Voice Bot
 
-A voice-enabled web application built for interview and recruiter interactions. A recruiter can tap a microphone, ask any question about Bhushan's background, work, and thinking, and receive a short, authentic voice response spoken in first person as Bhushan would answer, with the transcript displayed on-screen.
+An interactive, voice-enabled web application built for an engineering job assignment. A recruiter or interviewer can tap a microphone, ask an interview question, and hear a short, natural spoken answer in Bhushan's authentic voice and perspective (~30 seconds, 70–90 words), with the transcript displayed on screen.
 
-## Features
-- **Voice In & Voice Out**: Audio recorded directly in the browser (16 kHz mono WAV) and processed via Gemini API; spoken response returned and played back with Web Speech API fallback.
-- **Strictly Grounded**: All answers are grounded 100% in Bhushan's profile book in `/content`. Never fabricates facts or numbers.
-- **Fast & Lightweight**: Built with standard vanilla HTML, CSS, and ES modules in `/public`. No front-end frameworks or build steps.
-- **Serverless Architecture**: Node.js serverless functions in `/api` deployed on Vercel Hobby plan, with zero database dependencies.
+---
 
-## Project Structure
-```text
-.
-├── api/                # Vercel serverless functions (/api/chat, /api/speak, /api/health)
-├── content/            # Profile book markdown files (the bot's knowledge base)
-├── eval/               # Evaluation questions and test harness
-├── lib/                # Shared server-side modules (book loader, prompt builder, guardrails)
-├── public/             # Static frontend files (index.html, style.css, app.js)
-│   ├── cache/          # Pre-cached gold question answers
-│   └── js/             # Frontend utility modules
-├── scripts/            # Dev server, cache generator, smoke tests, evaluation scripts
-├── .env.example        # Environment variable template
-├── package.json        # Project metadata and scripts
-└── vercel.json         # Vercel deployment configuration
+## Architecture Overview
+
+```
+Recruiter / Browser
+  │
+  ├─► [Microphone] ──► Web Audio / MediaRecorder ──► Mono 16 kHz WAV ──┐
+  │                                                                    │
+  ├─► [Instant Chips Cache] ◄── /cache/chips.json & /cache/chip-*.wav  │
+  │                                                                    ▼
+  ├─► [Typed Input] ──────────────────────────────────────────► /api/chat (Vercel Serverless)
+  │                                                                    │
+  │   ◄── JSON { question, answer } ───────────────────────────────────┤
+  │                                                                    ▼
+  ├─► [/api/speak] ◄───────────────────────────────────────────── Gemini 3.5 Flash / Flash-Lite
+  │        │                                                           │
+  │        ▼                                                           ▼
+  └─► Gemini TTS (WAV) ──► Web Audio Playback (Device Voice Fallback)  Profile Book (/content/*.md)
 ```
 
-## Getting Started
+### Component Breakdown
+1. **Frontend (`/public`)**:
+   - Zero framework, zero build step, pure HTML5, CSS3, and ES modules.
+   - **Audio Recording**: Captures audio, downsamples/resamples to 16 kHz mono 16-bit linear PCM WAV using `OfflineAudioContext` directly in the browser.
+   - **Audio Playback**: Unlocks Web Audio on first tap to bypass mobile browser autoplay restrictions; plays server-generated WAV with fallback to `window.speechSynthesis`.
+   - **Instant Chip Cache**: The five example questions answer instantly with zero quota usage from pre-rendered JSON and WAV files in `public/cache/`.
+2. **Serverless Functions (`/api`)**:
+   - `/api/chat`: Validates payloads, enforces rate limits and daily caps, compiles system prompt from `/content/*.md`, and invokes Gemini API with structured JSON output and automatic fallback.
+   - `/api/speak`: Synthesizes natural spoken voice via Gemini TTS model, wraps raw PCM in 44-byte RIFF WAV headers, and returns base64 WAV.
+   - `/api/health`: Health check endpoint returning `{ ok: true }`.
+3. **Knowledge Base (`/content`)**:
+   - 11 markdown files capturing Bhushan's background, education, work at FCI CCM, problem-solving superpower, growth areas, resume metrics, and strict guardrails.
+
+---
+
+## Security & Privacy Note
+- **No Data Retention**: No voice recordings, transcripts, or personal data are stored in any database or on the server.
+- **Confidentiality**: Never reveals confidential client or company details from FCI CCM.
+- **Factual Honesty**: 100% grounded in Bhushan's profile book. Does not fabricate numbers or claims. Collaborative tools are attributed to the team.
+- **Guardrails**: Resists prompt injection, ignores instruction-override attempts, politely deflects off-topic questions, and keeps contact/salary discussions professional.
+- **Security Headers**: Strict Content-Security-Policy (CSP), Permissions-Policy, X-Content-Type-Options, and Referrer-Policy configured in `vercel.json` and local dev server.
+
+---
+
+## Environment Variables
+
+Configure these in `.env.local` for local development and in the Vercel Project Settings for production:
+
+| Variable | Description | Recommended / Tested Value |
+| :--- | :--- | :--- |
+| `GEMINI_API_KEY` | Google AI Studio Gemini API Key | *(Secret, never committed)* |
+| `GEMINI_MODEL` | Primary chat completion model | `gemini-3.5-flash-lite` or `gemini-3.8-flash` |
+| `GEMINI_FALLBACK_MODEL` | Fallback model if primary encounters 429/503 | `gemini-3.1-flash-lite` or `gemini-flash-latest` |
+| `GEMINI_TTS_MODEL` | Multimodal voice generation model | `gemini-2.5-flash-preview-tts` |
+| `TTS_VOICE` | Prebuilt voice personality name | `Puck` (Warm, natural male tone) |
+| `DAILY_CAP` | Maximum daily requests per instance | `200` |
+
+### Available TTS Voices
+You can configure `TTS_VOICE` to any of the following Gemini prebuilt voices:
+- `Puck`: Warm, natural, friendly conversational tone (Default, recommended for Bhushan)
+- `Charon`: Deeper, calm, thoughtful tone
+- `Kore`: Clear, articulate, bright tone
+- `Fenrir`: Strong, confident tone
+- `Aoede`: Warm, expressive tone
+
+---
+
+## Quick Start & Running Locally
 
 ### Prerequisites
 - Node.js >= 20.0.0
-- Google AI Studio API Key (free tier)
 
-### Available TTS Voices
-You can configure `TTS_VOICE` in `.env.local` to any of the following Gemini prebuilt voices:
-- `Puck`: Warm, natural, friendly conversational tone (Default, recommended for Bhushan's persona)
-- `Charon`: Deeper, calm, thoughtful tone
-- `Kore`: Clear, bright, articulate tone
-- `Fenrir`: Strong, confident tone
-- `Aoede`: Expressive, warm female tone
-
-### Voice Generation Models
-Set `GEMINI_TTS_MODEL` in `.env.local` to a multimodal audio-output capable Gemini model:
-- `gemini-2.0-flash` (or `gemini-2.5-flash`)
-
-1. Copy the environment template:
+### Steps
+1. Clone the repository and navigate into the folder.
+2. Create `.env.local`:
    ```bash
    cp .env.example .env.local
    ```
-2. Populate `.env.local` with your Gemini API credentials:
-   ```env
-   GEMINI_API_KEY=your_key_here
-   GEMINI_MODEL=gemini-2.5-flash
-   GEMINI_FALLBACK_MODEL=gemini-1.5-flash
-   GEMINI_TTS_MODEL=gemini-2.5-flash-tts
-   TTS_VOICE=en-US-Journey-F
-   DAILY_CAP=100
-   ```
-3. Start the local development server:
+   Add your `GEMINI_API_KEY` into `.env.local`.
+3. Start the local server:
    ```bash
    npm run dev
    ```
 4. Open [http://localhost:3000](http://localhost:3000) in your browser.
-5. Verify API health check:
-   ```bash
-   curl http://localhost:3000/api/health
-   ```
+
+---
+
+## Available Scripts
+
+- `npm run dev`: Starts the local development server at `http://localhost:3000` with hot reloading and environment variable support.
+- `npm run smoke`: Runs automated smoke tests against the dev server verifying HTML serving, `/api/health`, and error handling.
+- `npm run cache`: Generates pre-cached JSON and WAV files in `public/cache/` for the 5 sample questions.
+- `npm run eval`: Runs the evaluation test suite across 25 benchmark interview questions.
+
+---
+
+## Known Limits
+- **Serverless In-Memory Rate Limiting**: The rate limiter and daily cap use in-memory counters, which are ephemeral per serverless instance (best-effort protection).
+- **Mobile Audio Autoplay**: Mobile browsers (iOS Safari, Android Chrome) require a user tap to unlock audio context playback.
+- **Microphone Permissions**: If microphone permission is denied, the app automatically falls back to browser speech recognition or focuses the typing box.

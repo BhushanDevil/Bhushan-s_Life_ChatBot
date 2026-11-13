@@ -1,0 +1,40 @@
+{
+  "generatedAt": "2026-11-13T07:14:11.298Z",
+  "chips": [
+    {
+      "id": "life-story",
+      "label": "Life Story",
+      "question": "What should we know about your life story in a few sentences?",
+      "answer": "I grew up in Bandra, Mumbai, and got hooked on computers when my dad brought home our first internet-connected computer when I was eleven. I studied Computer Engineering, then did a master’s in Data Science and Management through IIT Ropar and IIM Amritsar to learn the technical and business sides together. Now I’m a data scientist at FCI CCM, working on AI and data tools for banks and insurers. I like solving problems logically and keeping the people around me happy.",
+      "audioUrl": "/cache/chip-0.wav"
+    },
+    {
+      "id": "superpower",
+      "label": "Superpower",
+      "question": "What is your number one superpower?",
+      "answer": "My superpower is logical problem-solving. I don’t jump straight to a fix; I first ask why the problem exists. At FCI CCM, a dashboard was taking three to four minutes to load. Instead of just making it look faster, I traced it back to the queries and the amount of data behind it, and fixed it there. The problem on the screen isn’t always the real problem, so I go one level deeper.",
+      "audioUrl": "/cache/chip-1.wav"
+    },
+    {
+      "id": "growth-areas",
+      "label": "Growth Areas",
+      "question": "What are the top three areas you would like to grow in?",
+      "answer": "First, I want to build complete AI products end to end, taking ideas from the initial business problem all the way to deployment and monitoring. Second, I am focusing on leadership by owning larger projects and guiding teams through uncertain decisions. Third, I want to strengthen my product and business thinking so I can always ensure we are building solutions that create true value for customers.",
+      "audioUrl": "/cache/chip-2.wav"
+    },
+    {
+      "id": "misconception",
+      "label": "Misconception",
+      "question": "What misconception do your coworkers have about you?",
+      "answer": "People who don’t know me well sometimes think I’m very serious or purely technical because I get really focused on hard problems. Once they get to know me, they quickly find out I’m actually quite funny, talkative, and love making people laugh. I have two modes: logical and focused when I am solving a problem, and light and fun when I am socializing, because I believe work should be productive without being stressful.",
+      "audioUrl": "/cache/chip-3.wav"
+    },
+    {
+      "id": "pushing-limits",
+      "label": "Pushing Limits",
+      "question": "How do you push your boundaries and limits?",
+      "answer": "I push my limits by picking up problems I don't know how to solve yet. Recently, I tried building an AI agent to find and fix bugs in a large Java codebase, which taught me new concepts like Abstract Syntax Trees and code-aware chunking. Although we stopped the project because of high costs and existing market tools, I learned how to debug retrieval steps and grew my technical toolkit. I don't need to know everything before starting; I just need to be willing to learn and experiment.",
+      "audioUrl": "/cache/chip-4.wav"
+    }
+  ]
+}

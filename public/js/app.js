@@ -29,8 +29,24 @@ import {
 const state = {
   history: [], // [{ role: 'user' | 'model', text: string }] (max 6 turns)
   currentState: 'idle', // 'idle' | 'listening' | 'thinking' | 'speaking'
-  recordingPromise: null
+  cachedChips: [] // Cached { question, answer, audioUrl }
 };
+
+/**
+ * Loads pre-cached answers and audio for the 5 sample questions
+ */
+async function loadChipsCache() {
+  try {
+    const res = await fetch('/cache/chips.json');
+    if (res.ok) {
+      const data = await res.json();
+      state.cachedChips = data.chips || [];
+      console.log(`Loaded ${state.cachedChips.length} pre-cached chip answers.`);
+    }
+  } catch (err) {
+    console.warn('Could not load chips cache, will use live API:', err);
+  }
+}
 
 function setState(newState) {
   state.currentState = newState;
@@ -120,7 +136,7 @@ async function processQuery({ text = null, audioWavBase64 = null }) {
 
     // Show answer text bubble immediately on screen
     appendMessage('bot', answer, () => {
-      handleTextQuery('Could you tell me more about that?');
+      handleTextQuery('Please tell me more about that');
     });
 
     // Start spoken voice output
@@ -130,6 +146,58 @@ async function processQuery({ text = null, audioWavBase64 = null }) {
     showToast('An unexpected network error occurred. Please try again.');
     setState('idle');
   }
+}
+
+/**
+ * Handles chip clicks by checking cache first for instant zero-latency zero-quota response
+ */
+async function handleChipClick(questionText) {
+  unlockAudioContext();
+  stopPlayback();
+
+  const cached = state.cachedChips.find(
+    c => c.question.toLowerCase().trim() === questionText.toLowerCase().trim()
+  );
+
+  if (cached && cached.answer) {
+    // Show user and bot bubbles immediately
+    appendMessage('user', cached.question);
+    recordTurn('user', cached.question);
+
+    appendMessage('bot', cached.answer, () => {
+      handleTextQuery('Please tell me more about that');
+    });
+    recordTurn('model', cached.answer);
+
+    // Play cached WAV audio immediately
+    if (cached.audioUrl) {
+      setState('speaking');
+      try {
+        const audioRes = await fetch(cached.audioUrl);
+        if (audioRes.ok) {
+          const arrayBuffer = await audioRes.arrayBuffer();
+          const ctx = unlockAudioContext();
+          const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+          const source = ctx.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(ctx.destination);
+          source.onended = () => setState('idle');
+          source.start(0);
+          return;
+        }
+      } catch (err) {
+        console.warn('Cached WAV playback error, falling back to device voice:', err);
+      }
+      speakWithDeviceVoice(cached.answer, () => setState('idle'));
+      return;
+    } else {
+      speakWithDeviceVoice(cached.answer, () => setState('idle'));
+      return;
+    }
+  }
+
+  // Fallback to live API call if cache misses
+  handleTextQuery(questionText);
 }
 
 /**
@@ -228,6 +296,7 @@ function resetConversation() {
  */
 function init() {
   initDialog();
+  loadChipsCache();
 
   // Mic button
   if (elements.btnMic) {
@@ -242,12 +311,12 @@ function init() {
     });
   }
 
-  // Example question chips
+  // Example question chips (serves instantly from cache if available)
   if (elements.chipsContainer) {
     elements.chipsContainer.addEventListener('click', (e) => {
       const chip = e.target.closest('.chip');
       if (chip && chip.dataset.question) {
-        handleTextQuery(chip.dataset.question);
+        handleChipClick(chip.dataset.question);
       }
     });
   }

@@ -58,7 +58,7 @@ export default async function handler(req, res) {
     });
   }
 
-  const ttsModel = process.env.GEMINI_TTS_MODEL || process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  const ttsModel = process.env.GEMINI_TTS_MODEL || 'gemini-2.5-flash-preview-tts';
   const voiceName = process.env.TTS_VOICE || 'Puck';
 
   try {

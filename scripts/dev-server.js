@@ -61,8 +61,15 @@ export const MIME_TYPES = {
   '.txt': 'text/plain; charset=utf-8'
 };
 
-// Polyfill Vercel-like response helpers
+// Polyfill Vercel-like response helpers & attach security headers
 export function enhanceResponse(res) {
+  // Apply security headers per Prompt 7
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob: data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none';");
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'microphone=(self), camera=(), geolocation=()');
+  res.setHeader('X-Frame-Options', 'DENY');
+
   if (!res.status) {
     res.status = function (code) {
       res.statusCode = code;
