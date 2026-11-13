@@ -1,6 +1,7 @@
 /**
  * public/js/audio.js
- * Browser-side audio recording, mono 16 kHz WAV encoding, playback, and voice fallbacks.
+ * Browser-side audio recording, mono 16 kHz WAV encoding, precision audio playback,
+ * word-by-word streaming text synchronization, and young male voice fallbacks.
  */
 
 let audioCtx = null;
@@ -10,6 +11,34 @@ let currentStream = null;
 let recordingTimer = null;
 let recordingSeconds = 0;
 let speakAbortController = null;
+let syncAnimFrame = null;
+
+// Important keywords for progressive emphasis
+const KEYWORDS = [
+  'logical problem-solving',
+  'problem-solving',
+  'root cause',
+  'fci ccm',
+  '4.5 million',
+  '45% faster',
+  'productlens',
+  'vartasense',
+  'iit ropar',
+  'iim amritsar',
+  'python',
+  'sql',
+  'pyspark',
+  'databricks',
+  'rag',
+  'bandra',
+  '25,000',
+  '12,000',
+  '92% agreement',
+  'f1-score',
+  '0.89',
+  'superpower',
+  'next-best-action'
+];
 
 /**
  * Creates and resumes the shared Web Audio context on user gesture
@@ -25,6 +54,81 @@ export function unlockAudioContext() {
     audioCtx.resume();
   }
   return audioCtx;
+}
+
+/**
+ * Parses response text into sentence and word token objects with timing weights
+ */
+export function prepareSynchronizedText(text) {
+  if (!text) return [];
+
+  // Match sentences
+  const sentenceRegex = /[^.!?]+[.!?]+(\s|$)|[^.!?]+$/g;
+  const rawSentences = text.match(sentenceRegex) || [text];
+
+  const lowerText = text.toLowerCase();
+  const matchedKeywords = KEYWORDS.filter(kw => lowerText.includes(kw));
+
+  const words = [];
+  let globalWordIndex = 0;
+
+  rawSentences.forEach((sentenceText, sIdx) => {
+    const rawWords = sentenceText.trim().split(/\s+/).filter(Boolean);
+
+    rawWords.forEach((wordStr) => {
+      const cleanWord = wordStr.toLowerCase().replace(/^[^\w]+|[^\w]+$/g, '');
+
+      // Check if word is part of any key phrase
+      const isKeyword = matchedKeywords.some(kw => kw.includes(cleanWord) && cleanWord.length > 2);
+
+      // Duration weight: letters + punctuation pause bonus
+      let weight = Math.max(2, cleanWord.length);
+      if (/[.,;:\u2014]/.test(wordStr)) {
+        weight += 4; // micro-pause
+      }
+      if (/[.!?]/.test(wordStr)) {
+        weight += 6; // clause pause
+      }
+
+      words.push({
+        globalIndex: globalWordIndex++,
+        sentenceIndex: sIdx,
+        rawText: wordStr,
+        cleanText: cleanWord,
+        isKeyword,
+        weight,
+        startTime: 0,
+        endTime: 0
+      });
+    });
+  });
+
+  return words;
+}
+
+/**
+ * Computes exact start and end timestamps (in seconds) for each word given audio duration
+ */
+export function computeWordTimings(words, totalDurationSeconds) {
+  if (!words || words.length === 0) return words;
+
+  const totalWeight = words.reduce((sum, w) => sum + w.weight, 0);
+  let currentSec = 0;
+
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    const wordDuration = (w.weight / totalWeight) * totalDurationSeconds;
+    w.startTime = currentSec;
+    w.endTime = currentSec + wordDuration;
+    currentSec += wordDuration;
+  }
+
+  // Ensure last word aligns with duration
+  if (words.length > 0) {
+    words[words.length - 1].endTime = Math.max(words[words.length - 1].endTime, totalDurationSeconds);
+  }
+
+  return words;
 }
 
 /**
@@ -53,34 +157,20 @@ function encodeWavBuffer(samples, sampleRate = 16000) {
   const buffer = new ArrayBuffer(44 + samples.length * 2);
   const view = new DataView(buffer);
 
-  // RIFF identifier
   writeString(view, 0, 'RIFF');
-  // RIFF chunk length
   view.setUint32(4, 36 + samples.length * 2, true);
-  // RIFF type
   writeString(view, 8, 'WAVE');
-  // format chunk identifier
   writeString(view, 12, 'fmt ');
-  // format chunk length
   view.setUint32(16, 16, true);
-  // sample format (1 = raw PCM)
   view.setUint16(20, 1, true);
-  // channel count (1 = mono)
   view.setUint16(22, 1, true);
-  // sample rate
   view.setUint32(24, sampleRate, true);
-  // byte rate (sampleRate * 1 * 2)
   view.setUint32(28, sampleRate * 2, true);
-  // block align (1 * 2)
   view.setUint16(32, 2, true);
-  // bits per sample
   view.setUint16(34, 16, true);
-  // data chunk identifier
   writeString(view, 36, 'data');
-  // data chunk length
   view.setUint32(40, samples.length * 2, true);
 
-  // Write 16-bit PCM samples with clipping protection
   let offset = 44;
   for (let i = 0; i < samples.length; i++, offset += 2) {
     const s = Math.max(-1, Math.min(1, samples[i]));
@@ -120,7 +210,6 @@ export async function convertBlobToMono16kWav(blob) {
 
   const wavArrayBuffer = encodeWavBuffer(monoSamples, targetSampleRate);
 
-  // Convert ArrayBuffer to base64
   let binary = '';
   const bytes = new Uint8Array(wavArrayBuffer);
   const len = bytes.byteLength;
@@ -133,7 +222,7 @@ export async function convertBlobToMono16kWav(blob) {
 /**
  * Starts recording user voice
  */
-export async function startRecording({ onTick, onLevel }) {
+export async function startRecording({ onTick }) {
   unlockAudioContext();
 
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -166,7 +255,6 @@ export async function startRecording({ onTick, onLevel }) {
   recordingTimer = setInterval(() => {
     recordingSeconds++;
     if (onTick) onTick(recordingSeconds);
-    // Automatic cut-off at 30 seconds
     if (recordingSeconds >= 30) {
       stopRecording();
     }
@@ -177,7 +265,6 @@ export async function startRecording({ onTick, onLevel }) {
       clearInterval(recordingTimer);
       recordingTimer = null;
 
-      // Stop all tracks to turn off mic hardware indicator
       stream.getTracks().forEach(track => track.stop());
       currentStream = null;
       currentMediaRecorder = null;
@@ -196,7 +283,7 @@ export async function startRecording({ onTick, onLevel }) {
       reject(e.error || new Error('RECORDING_FAILED'));
     };
 
-    recorder.start(250); // Slice every 250ms
+    recorder.start(250);
   });
 }
 
@@ -217,9 +304,12 @@ export function isRecording() {
 }
 
 /**
- * Plays base64 WAV audio through the Web Audio context
+ * Plays base64 WAV audio through the Web Audio context with real-time onTimeUpdate sync
+ * @param {string} base64Wav
+ * @param {Function} [onTimeUpdate] - Called with (currentSeconds, totalSeconds) on every animation frame
+ * @param {Function} [onEnded] - Called when playback completes
  */
-export async function playWavBase64(base64Wav, onEnded) {
+export async function playWavBase64(base64Wav, onTimeUpdate, onEnded) {
   stopPlayback();
   const ctx = unlockAudioContext();
 
@@ -231,26 +321,90 @@ export async function playWavBase64(base64Wav, onEnded) {
   }
 
   const audioBuffer = await ctx.decodeAudioData(bytes.buffer);
+  const duration = audioBuffer.duration;
   const source = ctx.createBufferSource();
   source.buffer = audioBuffer;
   source.connect(ctx.destination);
 
   currentSourceNode = source;
+  const playbackStartTime = ctx.currentTime;
+
+  // Real-time synchronization loop locked to hardware audio clock
+  function trackSync() {
+    if (currentSourceNode !== source) return;
+
+    const elapsed = ctx.currentTime - playbackStartTime;
+    if (onTimeUpdate) {
+      onTimeUpdate(elapsed, duration);
+    }
+
+    if (elapsed < duration) {
+      syncAnimFrame = requestAnimationFrame(trackSync);
+    }
+  }
 
   source.onended = () => {
     if (currentSourceNode === source) {
+      if (syncAnimFrame) cancelAnimationFrame(syncAnimFrame);
+      if (onTimeUpdate) onTimeUpdate(duration, duration); // mark complete
       currentSourceNode = null;
       if (onEnded) onEnded();
     }
   };
 
   source.start(0);
+  syncAnimFrame = requestAnimationFrame(trackSync);
+
+  return duration;
 }
 
 /**
- * Browser SpeechSynthesis fallback
+ * Plays an audio buffer (e.g. from fetched ArrayBuffer) with real-time onTimeUpdate sync
  */
-export function speakWithDeviceVoice(text, onEnded) {
+export async function playAudioBuffer(audioBuffer, onTimeUpdate, onEnded) {
+  stopPlayback();
+  const ctx = unlockAudioContext();
+  const duration = audioBuffer.duration;
+
+  const source = ctx.createBufferSource();
+  source.buffer = audioBuffer;
+  source.connect(ctx.destination);
+
+  currentSourceNode = source;
+  const playbackStartTime = ctx.currentTime;
+
+  function trackSync() {
+    if (currentSourceNode !== source) return;
+
+    const elapsed = ctx.currentTime - playbackStartTime;
+    if (onTimeUpdate) {
+      onTimeUpdate(elapsed, duration);
+    }
+
+    if (elapsed < duration) {
+      syncAnimFrame = requestAnimationFrame(trackSync);
+    }
+  }
+
+  source.onended = () => {
+    if (currentSourceNode === source) {
+      if (syncAnimFrame) cancelAnimationFrame(syncAnimFrame);
+      if (onTimeUpdate) onTimeUpdate(duration, duration);
+      currentSourceNode = null;
+      if (onEnded) onEnded();
+    }
+  };
+
+  source.start(0);
+  syncAnimFrame = requestAnimationFrame(trackSync);
+
+  return duration;
+}
+
+/**
+ * Browser SpeechSynthesis fallback with young male voice profile and word-boundary sync
+ */
+export function speakWithDeviceVoice(text, onWordBoundary, onEnded) {
   stopPlayback();
 
   if (!window.speechSynthesis) {
@@ -261,19 +415,32 @@ export function speakWithDeviceVoice(text, onEnded) {
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
 
-  // Select preferred English voice
+  // Filter for natural young male English voices
   const voices = window.speechSynthesis.getVoices();
-  const englishVoice = voices.find(v => v.lang.startsWith('en-IN')) ||
-                       voices.find(v => v.lang.startsWith('en-GB')) ||
-                       voices.find(v => v.lang.startsWith('en-US')) ||
-                       voices.find(v => v.lang.startsWith('en'));
+  const youngMaleVoice = voices.find(v =>
+    v.lang.startsWith('en') &&
+    (v.name.includes('Male') || v.name.includes('Ryan') || v.name.includes('Alex') ||
+     v.name.includes('Daniel') || v.name.includes('Fred') || v.name.includes('Oliver') ||
+     v.name.includes('George') || v.name.includes('Guy'))
+  ) || voices.find(v => v.lang.startsWith('en-IN')) ||
+       voices.find(v => v.lang.startsWith('en-GB')) ||
+       voices.find(v => v.lang.startsWith('en-US')) ||
+       voices.find(v => v.lang.startsWith('en'));
 
-  if (englishVoice) {
-    utterance.voice = englishVoice;
+  if (youngMaleVoice) {
+    utterance.voice = youngMaleVoice;
   }
 
+  // Set youthful, conversational male cadence
+  utterance.pitch = 1.05; // Slightly higher pitch for young adult tone
   utterance.rate = 1.0;
-  utterance.pitch = 1.0;
+
+  // Real-time word boundary synchronization
+  utterance.onboundary = (e) => {
+    if (e.name === 'word' && onWordBoundary) {
+      onWordBoundary(e.charIndex, e.charLength || 5);
+    }
+  };
 
   utterance.onend = () => {
     if (onEnded) onEnded();
@@ -291,6 +458,11 @@ export function speakWithDeviceVoice(text, onEnded) {
  * Immediately stops all active audio playback (Web Audio & SpeechSynthesis)
  */
 export function stopPlayback() {
+  if (syncAnimFrame) {
+    cancelAnimationFrame(syncAnimFrame);
+    syncAnimFrame = null;
+  }
+
   if (speakAbortController) {
     speakAbortController.abort();
     speakAbortController = null;
@@ -301,7 +473,7 @@ export function stopPlayback() {
       currentSourceNode.stop();
       currentSourceNode.disconnect();
     } catch (e) {
-      // Ignore if already stopped
+      // Ignore
     }
     currentSourceNode = null;
   }

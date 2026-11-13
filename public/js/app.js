@@ -1,7 +1,7 @@
 /**
  * public/js/app.js
  * Main application orchestrator: connects audio recording, speech synthesis,
- * UI states, fallback pipelines, and API messaging.
+ * UI states, multi-session chat history, "For You" intelligence engine, and real-time streaming text sync.
  */
 
 import {
@@ -9,9 +9,17 @@ import {
   setControlState,
   updateTimerDisplay,
   appendMessage,
+  createSynchronizedStreamingMessage,
   clearChatStream,
   showToast,
-  initDialog
+  initDialog,
+  initThemeToggle,
+  toggleSidebar,
+  closeSidebar,
+  renderSidebarHistory,
+  openForYouDrawer,
+  closeForYouDrawer,
+  renderForYouSection
 } from './ui.js';
 import { sendChatMessage, requestSpeech } from './api.js';
 import {
@@ -19,17 +27,33 @@ import {
   startRecording,
   stopRecording,
   isRecording,
+  prepareSynchronizedText,
+  computeWordTimings,
   playWavBase64,
+  playAudioBuffer,
   speakWithDeviceVoice,
   stopPlayback,
   tryBrowserSpeechRecognition
 } from './audio.js';
+import {
+  loadAllChats,
+  getActiveChat,
+  setActiveChatId,
+  createNewChat,
+  addMessageToActiveChat,
+  deleteChat,
+  clearAllChats
+} from './history.js';
+import { generateRecommendations } from './recommendations.js';
 
 // Application State
 const state = {
+  activeChatId: null,
   history: [], // [{ role: 'user' | 'model', text: string }] (max 6 turns)
   currentState: 'idle', // 'idle' | 'listening' | 'thinking' | 'speaking'
-  cachedChips: [] // Cached { question, answer, audioUrl }
+  cachedChips: [], // Cached { question, answer, audioUrl }
+  currentStreamer: null, // Active synchronized streaming message controller
+  searchQuery: ''
 };
 
 /**
@@ -54,20 +78,125 @@ function setState(newState) {
 }
 
 /**
- * Appends a message turn to history (capped at 6 recent turns)
+ * Stops any active audio and reveals remaining streamed text immediately
  */
-function recordTurn(role, text) {
-  state.history.push({ role, text });
-  if (state.history.length > 6) {
-    state.history = state.history.slice(-6);
+function stopActivePlaybackAndStreaming() {
+  if (state.currentStreamer) {
+    state.currentStreamer.completeStreaming();
+    state.currentStreamer = null;
   }
+  stopPlayback();
 }
 
 /**
- * Handles playing the spoken voice for an answer (Gemini TTS -> Device Voice fallback)
+ * Refreshes the conversation history list in the sidebar
  */
-async function speakAnswer(answerText) {
+function refreshSidebar() {
+  const chats = loadAllChats();
+  renderSidebarHistory(
+    chats,
+    state.activeChatId,
+    state.searchQuery,
+    (id) => loadChatSession(id),
+    (id) => handleDeleteChat(id)
+  );
+}
+
+/**
+ * Refreshes the personalized "For You" drawer
+ */
+function refreshRecommendations() {
+  const activeChat = getActiveChat();
+  const recData = generateRecommendations(activeChat.history || []);
+  renderForYouSection(recData, (question) => {
+    handleChipOrText(question);
+  });
+}
+
+/**
+ * Loads a specific chat session into view
+ */
+function loadChatSession(chatId) {
+  stopActivePlaybackAndStreaming();
+  if (isRecording()) stopRecording();
+
+  setActiveChatId(chatId);
+  const chat = getActiveChat();
+  state.activeChatId = chat.id;
+  state.history = (chat.history || []).slice(-6);
+
+  clearChatStream();
+
+  if (chat.history && chat.history.length > 0) {
+    chat.history.forEach(m => {
+      if (m.role === 'user') {
+        appendMessage('user', m.text);
+      } else {
+        appendMessage('bot', m.text, () => {
+          handleTextQuery('Please tell me more about that');
+        });
+      }
+    });
+  }
+
+  setState('idle');
+  refreshSidebar();
+  refreshRecommendations();
+}
+
+/**
+ * Starts a brand-new conversation session
+ */
+function startNewChatSession() {
+  stopActivePlaybackAndStreaming();
+  if (isRecording()) stopRecording();
+
+  const newChat = createNewChat('New Conversation');
+  state.activeChatId = newChat.id;
+  state.history = [];
+
+  clearChatStream();
+  setState('idle');
+  refreshSidebar();
+  refreshRecommendations();
+  showToast('Started a new conversation.');
+}
+
+/**
+ * Deletes a chat session
+ */
+function handleDeleteChat(id) {
+  deleteChat(id);
+  const active = getActiveChat();
+  loadChatSession(active.id);
+  showToast('Conversation deleted.');
+}
+
+/**
+ * Clears all conversation sessions
+ */
+function handleClearAllChats() {
+  stopActivePlaybackAndStreaming();
+  if (isRecording()) stopRecording();
+
+  clearAllChats();
+  const active = getActiveChat();
+  state.activeChatId = active.id;
+  state.history = [];
+
+  clearChatStream();
+  setState('idle');
+  refreshSidebar();
+  refreshRecommendations();
+  showToast('All conversation history cleared.');
+}
+
+/**
+ * Plays spoken voice for an answer with real-time word-by-word streaming synchronization
+ */
+async function speakAnswer(answerText, words, streamer) {
   if (!answerText) {
+    if (streamer) streamer.completeStreaming();
     setState('idle');
     return;
   }
@@ -78,34 +207,70 @@ async function speakAnswer(answerText) {
     const ttsRes = await requestSpeech(answerText);
 
     if (ttsRes.ok && ttsRes.audio) {
-      await playWavBase64(ttsRes.audio, () => {
-        setState('idle');
-      });
+      let timingsComputed = false;
+      await playWavBase64(
+        ttsRes.audio,
+        (elapsed, duration) => {
+          if (!timingsComputed) {
+            computeWordTimings(words, duration);
+            timingsComputed = true;
+          }
+          if (streamer) streamer.updateSpokenWord(elapsed, duration);
+        },
+        () => {
+          if (streamer) streamer.completeStreaming();
+          state.currentStreamer = null;
+          setState('idle');
+        }
+      );
       return;
     }
   } catch (err) {
     console.warn('Gemini TTS failed, engaging device voice fallback:', err);
   }
 
-  // Graceful fallback to device voice
-  speakWithDeviceVoice(answerText, () => {
-    setState('idle');
-  });
+  // Graceful fallback to device voice with word-boundary synchronization
+  const estimatedDuration = Math.max(1, words.length * 0.38);
+  computeWordTimings(words, estimatedDuration);
+
+  speakWithDeviceVoice(
+    answerText,
+    (charIndex) => {
+      let currentChars = 0;
+      for (let i = 0; i < words.length; i++) {
+        if (currentChars >= charIndex || i === words.length - 1) {
+          if (streamer) streamer.updateSpokenWord(words[i].startTime + 0.01, estimatedDuration);
+          break;
+        }
+        currentChars += words[i].rawText.length + 1;
+      }
+    },
+    () => {
+      if (streamer) streamer.completeStreaming();
+      state.currentStreamer = null;
+      setState('idle');
+    }
+  );
 }
 
 /**
- * Processes a question query (either typed text or recorded audio)
+ * Processes a question query (typed text or recorded audio)
  */
 async function processQuery({ text = null, audioWavBase64 = null }) {
   if (state.currentState === 'thinking') return;
 
   setState('thinking');
+  stopActivePlaybackAndStreaming();
 
-  // If text, show user bubble immediately
+  // If text query, show user bubble immediately
   if (text) {
     appendMessage('user', text);
-    recordTurn('user', text);
+    addMessageToActiveChat('user', text);
+    state.history.push({ role: 'user', text });
+    if (state.history.length > 6) state.history = state.history.slice(-6);
     elements.chatInput.value = '';
+    refreshSidebar();
+    refreshRecommendations();
   }
 
   try {
@@ -129,18 +294,28 @@ async function processQuery({ text = null, audioWavBase64 = null }) {
     // If audio query, show the transcribed question
     if (audioWavBase64 && question && question !== 'unclear') {
       appendMessage('user', question);
-      recordTurn('user', question);
+      addMessageToActiveChat('user', question);
+      state.history.push({ role: 'user', question });
+      if (state.history.length > 6) state.history = state.history.slice(-6);
+      refreshSidebar();
+      refreshRecommendations();
     }
 
-    recordTurn('model', answer);
+    addMessageToActiveChat('model', answer);
+    state.history.push({ role: 'model', text: answer });
+    if (state.history.length > 6) state.history = state.history.slice(-6);
+    refreshSidebar();
+    refreshRecommendations();
 
-    // Show answer text bubble immediately on screen
-    appendMessage('bot', answer, () => {
+    // Prepare synchronized text streamer
+    const words = prepareSynchronizedText(answer);
+    const streamer = createSynchronizedStreamingMessage(words, () => {
       handleTextQuery('Please tell me more about that');
     });
+    state.currentStreamer = streamer;
 
-    // Start spoken voice output
-    await speakAnswer(answer);
+    // Start spoken voice output with real-time text synchronization
+    await speakAnswer(answer, words, streamer);
   } catch (err) {
     console.error('Chat processing error:', err);
     showToast('An unexpected network error occurred. Please try again.');
@@ -149,25 +324,35 @@ async function processQuery({ text = null, audioWavBase64 = null }) {
 }
 
 /**
- * Handles chip clicks by checking cache first for instant zero-latency zero-quota response
+ * Handles chip clicks or recommended questions with cache support and synchronized streaming
  */
-async function handleChipClick(questionText) {
+async function handleChipOrText(questionText) {
   unlockAudioContext();
-  stopPlayback();
+  stopActivePlaybackAndStreaming();
 
   const cached = state.cachedChips.find(
     c => c.question.toLowerCase().trim() === questionText.toLowerCase().trim()
   );
 
   if (cached && cached.answer) {
-    // Show user and bot bubbles immediately
+    // Show user bubble
     appendMessage('user', cached.question);
-    recordTurn('user', cached.question);
+    addMessageToActiveChat('user', cached.question);
+    state.history.push({ role: 'user', text: cached.question });
+    if (state.history.length > 6) state.history = state.history.slice(-6);
 
-    appendMessage('bot', cached.answer, () => {
+    // Prepare synchronized streaming bubble
+    const words = prepareSynchronizedText(cached.answer);
+    const streamer = createSynchronizedStreamingMessage(words, () => {
       handleTextQuery('Please tell me more about that');
     });
-    recordTurn('model', cached.answer);
+    state.currentStreamer = streamer;
+
+    addMessageToActiveChat('model', cached.answer);
+    state.history.push({ role: 'model', text: cached.answer });
+    if (state.history.length > 6) state.history = state.history.slice(-6);
+    refreshSidebar();
+    refreshRecommendations();
 
     // Play cached WAV audio immediately
     if (cached.audioUrl) {
@@ -178,25 +363,30 @@ async function handleChipClick(questionText) {
           const arrayBuffer = await audioRes.arrayBuffer();
           const ctx = unlockAudioContext();
           const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-          const source = ctx.createBufferSource();
-          source.buffer = audioBuffer;
-          source.connect(ctx.destination);
-          source.onended = () => setState('idle');
-          source.start(0);
+          computeWordTimings(words, audioBuffer.duration);
+
+          await playAudioBuffer(
+            audioBuffer,
+            (elapsed, duration) => streamer.updateSpokenWord(elapsed, duration),
+            () => {
+              streamer.completeStreaming();
+              state.currentStreamer = null;
+              setState('idle');
+            }
+          );
           return;
         }
       } catch (err) {
-        console.warn('Cached WAV playback error, falling back to device voice:', err);
+        console.warn('Cached WAV playback error, falling back to live speech:', err);
       }
-      speakWithDeviceVoice(cached.answer, () => setState('idle'));
-      return;
-    } else {
-      speakWithDeviceVoice(cached.answer, () => setState('idle'));
-      return;
     }
+
+    // Fallback if cached WAV fetch fails
+    await speakAnswer(cached.answer, words, streamer);
+    return;
   }
 
-  // Fallback to live API call if cache misses
+  // Not in cache: send via standard live flow
   handleTextQuery(questionText);
 }
 
@@ -206,7 +396,7 @@ async function handleChipClick(questionText) {
 function handleTextQuery(queryText) {
   const text = queryText.trim();
   if (!text) return;
-  stopPlayback();
+  stopActivePlaybackAndStreaming();
   processQuery({ text });
 }
 
@@ -218,7 +408,7 @@ async function handleMicClick() {
 
   // If already speaking, stop playback and return to idle
   if (state.currentState === 'speaking') {
-    stopPlayback();
+    stopActivePlaybackAndStreaming();
     setState('idle');
     return;
   }
@@ -235,7 +425,7 @@ async function handleMicClick() {
   }
 
   // If idle, start listening
-  stopPlayback();
+  stopActivePlaybackAndStreaming();
   setState('listening');
 
   try {
@@ -256,7 +446,6 @@ async function handleMicClick() {
     setState('idle');
 
     if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || err.message === 'MEDIA_NOT_SUPPORTED') {
-      // Try browser speech recognition fallback
       const recognitionStarted = tryBrowserSpeechRecognition(
         (transcript) => {
           handleTextQuery(transcript);
@@ -279,24 +468,16 @@ async function handleMicClick() {
 }
 
 /**
- * Resets the conversation to a clean slate
- */
-function resetConversation() {
-  stopPlayback();
-  if (isRecording()) stopRecording();
-
-  state.history = [];
-  clearChatStream();
-  setState('idle');
-  showToast('Started a new conversation.');
-}
-
-/**
  * Initializes listeners and lifecycle events
  */
 function init() {
   initDialog();
+  initThemeToggle();
   loadChipsCache();
+
+  // Load active chat session
+  const activeChat = getActiveChat();
+  loadChatSession(activeChat.id);
 
   // Mic button
   if (elements.btnMic) {
@@ -306,17 +487,17 @@ function init() {
   // Stop button
   if (elements.btnStop) {
     elements.btnStop.addEventListener('click', () => {
-      stopPlayback();
+      stopActivePlaybackAndStreaming();
       setState('idle');
     });
   }
 
-  // Example question chips (serves instantly from cache if available)
+  // Example question chips
   if (elements.chipsContainer) {
     elements.chipsContainer.addEventListener('click', (e) => {
       const chip = e.target.closest('.chip');
       if (chip && chip.dataset.question) {
-        handleChipClick(chip.dataset.question);
+        handleChipOrText(chip.dataset.question);
       }
     });
   }
@@ -329,15 +510,76 @@ function init() {
     });
   }
 
-  // New conversation button
-  if (elements.btnReset) {
-    elements.btnReset.addEventListener('click', resetConversation);
+  // Sidebar toggles
+  if (elements.btnMenuToggle) {
+    elements.btnMenuToggle.addEventListener('click', toggleSidebar);
   }
+  if (elements.btnCloseSidebar) {
+    elements.btnCloseSidebar.addEventListener('click', closeSidebar);
+  }
+  if (elements.sidebarBackdrop) {
+    elements.sidebarBackdrop.addEventListener('click', closeSidebar);
+  }
+
+  // Sidebar new chat
+  if (elements.btnNewChatSidebar) {
+    elements.btnNewChatSidebar.addEventListener('click', () => {
+      startNewChatSession();
+      if (window.innerWidth <= 900) closeSidebar();
+    });
+  }
+
+  // Sidebar search filter
+  if (elements.sidebarSearch) {
+    elements.sidebarSearch.addEventListener('input', (e) => {
+      state.searchQuery = e.target.value;
+      refreshSidebar();
+    });
+  }
+
+  // Sidebar clear all chats
+  if (elements.btnClearAllChats) {
+    elements.btnClearAllChats.addEventListener('click', () => {
+      if (confirm('Are you sure you want to delete all saved conversations?')) {
+        handleClearAllChats();
+        if (window.innerWidth <= 900) closeSidebar();
+      }
+    });
+  }
+
+  // "For You" drawer triggers
+  if (elements.btnForYouHeader) {
+    elements.btnForYouHeader.addEventListener('click', openForYouDrawer);
+  }
+  if (elements.btnOpenForYouSidebar) {
+    elements.btnOpenForYouSidebar.addEventListener('click', () => {
+      openForYouDrawer();
+      if (window.innerWidth <= 900) closeSidebar();
+    });
+  }
+  if (elements.btnCloseForYou) {
+    elements.btnCloseForYou.addEventListener('click', closeForYouDrawer);
+  }
+
+  // Close drawer if clicking outside
+  document.addEventListener('click', (e) => {
+    if (
+      elements.forYouDrawer &&
+      elements.forYouDrawer.classList.contains('open') &&
+      !elements.forYouDrawer.contains(e.target) &&
+      e.target !== elements.btnForYouHeader &&
+      !elements.btnForYouHeader.contains(e.target) &&
+      e.target !== elements.btnOpenForYouSidebar &&
+      !elements.btnOpenForYouSidebar.contains(e.target)
+    ) {
+      closeForYouDrawer();
+    }
+  });
 
   // Stop audio playback if tab becomes hidden
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-      stopPlayback();
+      stopActivePlaybackAndStreaming();
       if (isRecording()) {
         stopRecording();
       }
@@ -347,7 +589,7 @@ function init() {
     }
   });
 
-  console.log('Ask Bhushan voice app initialized with full voice in/out & fallbacks.');
+  console.log('Ask Bhushan voice app initialized with streaming sync, dark mode, history sidebar, and For You insights.');
 }
 
 document.addEventListener('DOMContentLoaded', init);

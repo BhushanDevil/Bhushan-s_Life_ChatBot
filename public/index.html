@@ -3,97 +3,220 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="AI voice bot answering questions as Bhushan in first person using Gemini">
+  <meta name="description" content="AI voice bot answering questions as Bhushan in first person with real-time text and speech synchronization">
   <title>Ask Bhushan — AI Voice Bot</title>
+  <!-- Immediate theme check to prevent flash of wrong theme -->
+  <script>
+    (function() {
+      try {
+        const saved = localStorage.getItem('bhushan_theme');
+        if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      } catch (e) {}
+    })();
+  </script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="app-layout">
-    <!-- Header -->
-    <header class="app-header">
-      <div class="header-top">
-        <div class="title-group">
-          <h1>Ask Bhushan</h1>
-          <p class="subtitle">AI Voice & Data Science Portfolio</p>
-        </div>
-        <div class="header-actions">
-          <button id="btn-about" class="btn-text" aria-haspopup="dialog" aria-label="About this bot">About</button>
-          <button id="btn-reset" class="btn-text" aria-label="Start new conversation">New Chat</button>
-        </div>
-      </div>
-      <div class="ai-banner" role="note">
-        <span class="banner-badge">AI Voice</span>
-        <span class="banner-text">This is an AI voice version of Bhushan, built to answer in his words.</span>
-      </div>
-    </header>
+  <div class="app-shell app-layout">
+    <!-- Mobile Sidebar Backdrop -->
+    <div id="sidebar-backdrop" class="sidebar-backdrop" aria-hidden="true"></div>
 
-    <!-- Example Chips -->
-    <section class="chips-section" aria-label="Suggested interview questions">
-      <p class="chips-label">Tap an example question:</p>
-      <div class="chips-container" id="chips-container">
-        <button class="chip" data-question="What should we know about your life story in a few sentences?">Life Story</button>
-        <button class="chip" data-question="What is your number one superpower?">Superpower</button>
-        <button class="chip" data-question="What are the top three areas you would like to grow in?">Growth Areas</button>
-        <button class="chip" data-question="What misconception do your coworkers have about you?">Misconception</button>
-        <button class="chip" data-question="How do you push your boundaries and limits?">Pushing Limits</button>
-      </div>
-    </section>
-
-    <!-- Chat / Transcript Stream -->
-    <main class="chat-main" id="chat-stream" role="log" aria-live="polite" aria-label="Conversation Transcript">
-      <div class="welcome-message">
-        <p>👋 Hi! I'm an AI voice version of Bhushan. Tap any question above, type below, or tap the microphone to ask anything about my work, projects, and background.</p>
-      </div>
-    </main>
-
-    <!-- Central Voice & Interaction Controls -->
-    <footer class="app-controls">
-      <!-- Voice status indicator and central mic button -->
-      <div class="voice-control-area">
-        <div class="status-indicator" id="status-indicator" aria-live="assertive">
-          <span class="status-text" id="status-text">Ready to talk</span>
-          <span class="status-timer" id="status-timer" hidden>00:00</span>
-        </div>
-
-        <div class="mic-wrapper">
-          <button id="btn-mic" class="btn-mic idle" aria-label="Tap to talk" title="Tap to talk">
-            <span class="mic-ring" aria-hidden="true"></span>
-            <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-              <line x1="12" x2="12" y1="19" y2="22"/>
-            </svg>
-            <div class="thinking-dots" aria-hidden="true">
-              <span></span><span></span><span></span>
-            </div>
-            <div class="speaking-bars" aria-hidden="true">
-              <span></span><span></span><span></span><span></span>
-            </div>
-          </button>
-          <button id="btn-stop" class="btn-stop" aria-label="Stop speaking" hidden>Stop</button>
-        </div>
-      </div>
-
-      <!-- Backup Text Input Form -->
-      <form id="chat-form" class="chat-form">
-        <input 
-          type="text" 
-          id="chat-input" 
-          class="chat-input" 
-          placeholder="Or type a question for Bhushan..." 
-          maxlength="500" 
-          autocomplete="off"
-          aria-label="Ask Bhushan a question"
-        >
-        <button type="submit" id="btn-send" class="btn-send" aria-label="Send question">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <line x1="22" y1="2" x2="11" y2="13"></line>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+    <!-- ChatGPT-style Sidebar -->
+    <aside id="chat-sidebar" class="chat-sidebar" aria-label="Conversation History">
+      <div class="sidebar-header">
+        <button id="btn-new-chat-sidebar" class="btn-new-chat" aria-label="Create a new conversation">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span>New Chat</span>
+        </button>
+        <button id="btn-close-sidebar" class="btn-close-sidebar" aria-label="Close sidebar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
         </button>
-      </form>
-    </footer>
+      </div>
+
+      <div class="sidebar-search-box">
+        <input type="text" id="sidebar-search" class="search-input" placeholder="Search conversations..." aria-label="Search conversation history">
+      </div>
+
+      <div class="sidebar-history-list" id="sidebar-history-list" role="navigation" aria-label="Past conversations">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <div class="sidebar-footer">
+        <button id="btn-open-for-you-sidebar" class="btn-sidebar-footer">
+          <span>✨</span>
+          <span>For You Recommendations</span>
+        </button>
+        <button id="btn-clear-all-chats" class="btn-sidebar-footer" style="color: #ef4444;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+          <span>Clear All History</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <div class="main-container">
+      <!-- Header -->
+      <header class="app-header">
+        <div class="header-left">
+          <button id="btn-menu-toggle" class="btn-menu-toggle" aria-label="Toggle chat history sidebar" title="Toggle history sidebar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <div class="title-group">
+            <h1>Ask Bhushan</h1>
+            <p class="subtitle">Young Male AI Voice & Data Science Portfolio</p>
+          </div>
+        </div>
+
+        <div class="header-right">
+          <button id="btn-for-you-header" class="btn-pill highlight" aria-label="Open personalized For You recommendations">
+            <span>✨</span>
+            <span>For You</span>
+          </button>
+          <button id="btn-theme-toggle" class="btn-icon" aria-label="Toggle dark/light theme" title="Toggle theme">
+            <!-- Sun icon (for dark mode) -->
+            <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+          </button>
+          <button id="btn-about" class="btn-icon" aria-haspopup="dialog" aria-label="About this bot" title="About this bot">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- AI Disclosure Banner -->
+      <div class="ai-banner" role="note">
+        <span class="banner-badge">AI Voice</span>
+        <span class="banner-text">This is an AI voice version of Bhushan, built to answer interview questions authentically in his words.</span>
+      </div>
+
+      <!-- Quick Chips Section -->
+      <section class="chips-section" aria-label="Suggested interview questions">
+        <div class="chips-container" id="chips-container">
+          <button class="chip" data-question="What should we know about your life story in a few sentences?">Life Story</button>
+          <button class="chip" data-question="What is your number one superpower?">Superpower</button>
+          <button class="chip" data-question="What are the top three areas you would like to grow in?">Growth Areas</button>
+          <button class="chip" data-question="What misconception do your coworkers have about you?">Misconception</button>
+          <button class="chip" data-question="How do you push your boundaries and limits?">Pushing Limits</button>
+        </div>
+      </section>
+
+      <!-- Chat / Transcript Stream with Word-by-Word Streaming -->
+      <main class="chat-main" id="chat-stream" role="log" aria-live="polite" aria-label="Conversation Transcript">
+        <div class="welcome-card">
+          <p>👋 <strong>Welcome!</strong> I'm an AI voice version of Bhushan, speaking with a natural young male voice and synchronized text. Tap any example question above, ask by voice with the microphone, or type below.</p>
+        </div>
+      </main>
+
+      <!-- Central Voice & Interaction Controls -->
+      <footer class="app-controls">
+        <div class="voice-control-area">
+          <div class="status-indicator" id="status-indicator" aria-live="assertive">
+            <span class="status-text" id="status-text">Ready to talk</span>
+            <span class="status-timer" id="status-timer" hidden>00:00</span>
+          </div>
+
+          <div class="mic-wrapper">
+            <button id="btn-mic" class="btn-mic idle" aria-label="Tap to talk" title="Tap to talk">
+              <span class="mic-ring" aria-hidden="true"></span>
+              <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" x2="12" y1="19" y2="22"/>
+              </svg>
+              <div class="thinking-dots" aria-hidden="true">
+                <span></span><span></span><span></span>
+              </div>
+              <div class="speaking-bars" aria-hidden="true">
+                <span></span><span></span><span></span><span></span>
+              </div>
+            </button>
+            <button id="btn-stop" class="btn-stop" aria-label="Stop speaking" hidden>Stop</button>
+          </div>
+        </div>
+
+        <form id="chat-form" class="chat-form">
+          <input 
+            type="text" 
+            id="chat-input" 
+            class="chat-input" 
+            placeholder="Type a question for Bhushan..." 
+            maxlength="500" 
+            autocomplete="off"
+            aria-label="Ask Bhushan a question"
+          >
+          <button type="submit" id="btn-send" class="btn-send" aria-label="Send question">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </form>
+      </footer>
+    </div>
   </div>
+
+  <!-- "For You" Slide-Over Drawer -->
+  <aside id="for-you-drawer" class="for-you-drawer" aria-label="Personalized For You recommendations">
+    <div class="drawer-header">
+      <h2><span>✨</span> For You Insights</h2>
+      <button id="btn-close-for-you" class="btn-close" aria-label="Close For You panel">&times;</button>
+    </div>
+    <div class="drawer-body">
+      <!-- Section 1: Topics Explored -->
+      <div>
+        <h3 class="drawer-section-title">Topics You've Explored (<span id="explored-count">0</span>/<span id="total-topics">7</span>)</h3>
+        <div class="topics-grid" id="topics-grid">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Section 2: Recommended Next Questions -->
+      <div>
+        <h3 class="drawer-section-title">Recommended Next Questions</h3>
+        <div class="recommendations-list" id="recommendations-list">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Section 3: Verified Portfolio Highlights -->
+      <div>
+        <h3 class="drawer-section-title">Verified Portfolio Highlights</h3>
+        <div class="highlights-grid" id="highlights-grid">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
+  </aside>
 
   <!-- Toast Notification Region -->
   <div id="toast-region" class="toast-region" role="status" aria-live="polite"></div>
@@ -102,14 +225,14 @@
   <dialog id="about-dialog" class="about-dialog">
     <div class="dialog-content">
       <div class="dialog-header">
-        <h2>About This Bot</h2>
+        <h2>About This Voice Bot</h2>
         <button id="btn-close-dialog" class="btn-close" aria-label="Close dialog">&times;</button>
       </div>
       <div class="dialog-body">
-        <p><strong>What is this?</strong> This is an interactive voice-enabled AI application built for a job assignment. It responds to interview questions authentically in first person, as Bhushan would answer them.</p>
-        <p><strong>How does it work?</strong> Powered by Google's Gemini models for understanding and voice synthesis. All answers are strictly grounded in a verified profile book authored from Bhushan's real experience, education, and achievements.</p>
-        <p><strong>Privacy & Trust:</strong> No voice recordings or conversation chats are stored on any server or database. The bot operates with hard rules protecting company confidentiality and avoiding fabricated facts.</p>
-        <p><strong>Note:</strong> Like all generative AI systems, responses may occasionally vary. For critical hiring inquiries, you can follow up directly through the assignment submission platform.</p>
+        <p><strong>What is this?</strong> An interactive voice-enabled AI application built for a job assignment, responding to interview questions authentically in first person with a natural young male voice and synchronized progressive text.</p>
+        <p><strong>How does it work?</strong> Powered by Google's Gemini models for conversational understanding and speech generation. Answers are 100% grounded in a verified profile book authored from Bhushan's real career experiences, data engineering achievements at FCI CCM, and dual degree studies (IIT Ropar + IIM Amritsar).</p>
+        <p><strong>Privacy & Trust:</strong> No voice recordings or conversations are stored on any server or database. The bot operates with hard rules preventing made-up facts and preserving company confidentiality.</p>
+        <p><strong>Note:</strong> Like all generative AI systems, responses may vary. For critical hiring inquiries, you can follow up directly through the assignment submission platform.</p>
       </div>
       <div class="dialog-footer">
         <button id="btn-dialog-done" class="btn-primary">Got it</button>

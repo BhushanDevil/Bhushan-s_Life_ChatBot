@@ -30,7 +30,7 @@ async function runSmokeTests() {
     throw new Error(`Failed to load root page: HTTP ${pageRes.status}`);
   }
   const pageHtml = await pageRes.text();
-  if (!pageHtml.includes('Ask Bhushan') || !pageHtml.includes('app-layout')) {
+  if (!pageHtml.includes('Ask Bhushan') || (!pageHtml.includes('app-layout') && !pageHtml.includes('app-shell'))) {
     throw new Error('Root page does not contain expected "Ask Bhushan" markup');
   }
   console.log(`  ✓ Root HTML page loaded successfully (${Math.round(pageHtml.length / 1024)} KB)`);

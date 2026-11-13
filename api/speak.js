@@ -46,6 +46,7 @@ export default async function handler(req, res) {
   }
 
   const { text } = validation;
+  const contextTone = typeof req.body.contextTone === 'string' ? req.body.contextTone : null;
 
   // 3. Check API key
   const apiKey = process.env.GEMINI_API_KEY;
@@ -59,12 +60,24 @@ export default async function handler(req, res) {
   }
 
   const ttsModel = process.env.GEMINI_TTS_MODEL || 'gemini-2.5-flash-preview-tts';
-  const voiceName = process.env.TTS_VOICE || 'Puck';
+  const voiceName = process.env.TTS_VOICE || 'Puck'; // Default young male voice
+
+  // Determine context-adaptive conversational style instruction
+  let styleInstruction = 'Speak naturally as Bhushan, a warm, bright, approachable young male data scientist. Use a conversational, human-like cadence with natural micro-pauses, smooth rhythm, and expressive intonation.';
+
+  const lowerText = text.toLowerCase();
+  if (contextTone === 'reflective' || lowerText.includes('stopped') || lowerText.includes('cost') || lowerText.includes('lesson') || lowerText.includes('misconception') || lowerText.includes('toughest')) {
+    styleInstruction = 'Speak in an honest, thoughtful, and humble young male voice as Bhushan. Use a reflective, relaxed conversational pace with gentle pauses, showing maturity and self-awareness.';
+  } else if (contextTone === 'technical' || lowerText.includes('faster') || lowerText.includes('pipeline') || lowerText.includes('records') || lowerText.includes('databricks') || lowerText.includes('superpower') || lowerText.includes('pyspark') || lowerText.includes('rag')) {
+    styleInstruction = 'Speak in an energetic, articulate, and confident young male voice as Bhushan. Emphasize technical problem-solving with enthusiasm, dynamic rhythm, and clear natural breathing pauses between key concepts.';
+  } else if (contextTone === 'narrative' || lowerText.includes('bandra') || lowerText.includes('father') || lowerText.includes('eleven') || lowerText.includes('grew up') || lowerText.includes('iit') || lowerText.includes('iim')) {
+    styleInstruction = 'Speak in an engaging, warm, narrative young male voice as Bhushan, telling your personal journey with an upbeat, friendly conversational cadence and natural expressive inflections.';
+  }
 
   try {
     const url = `${GEMINI_API_BASE}/${encodeURIComponent(ttsModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
-    const promptText = `Speak the following response naturally in a warm, friendly, calm conversational tone as Bhushan:\n\n${text}`;
+    const promptText = `${styleInstruction}\n\nSpoken Response:\n${text}`;
 
     const requestBody = {
       contents: [

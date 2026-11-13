@@ -1,6 +1,37 @@
 # Ask Bhushan — AI Voice Bot
 
-An interactive, voice-enabled web application built for an engineering job assignment. A recruiter or interviewer can tap a microphone, ask an interview question, and hear a short, natural spoken answer in Bhushan's authentic voice and perspective (~30 seconds, 70–90 words), with the transcript displayed on screen.
+An interactive, voice-enabled web application built for an engineering job assignment. A recruiter or interviewer can tap a microphone, ask an interview question, and hear a short, natural spoken answer in Bhushan's authentic voice and perspective (~30 seconds, 70–90 words), with real-time word-by-word streaming transcript synchronization.
+
+---
+
+## Key Features & UX Innovations
+
+1. **Real-Time Synchronized Streaming & Spoken Word Highlighting**:
+   - ChatGPT-like progressive word-by-word rendering locked to the hardware audio clock via `requestAnimationFrame`.
+   - Luminous spoken-word highlight (`.current-spoken-word`) and active sentence illumination (`.active-sentence`).
+   - Progressive keyword emphasis on core metrics (`45% faster`, `4.5 million`, `ProductLens`, `IIT Ropar`, `IIM Amritsar`, `root cause`).
+   - Zero word cut-off: if playback stops, the entire transcript completes immediately.
+
+2. **Dynamic Young Male Voice Experience**:
+   - Default Gemini voice set to `Puck` (natural, engaging young adult male tone).
+   - Context-adaptive cadence instructions in `/api/speak` (adjusts warmth, enthusiasm, and focus depending on technical, narrative, or reflective questions).
+   - Device voice fallback configured with youthful pitch (`1.05`) and Indian/US English male voices.
+
+3. **Complete Dark Mode Experience**:
+   - Comprehensive dark/light theme support with CSS variables across every component (chat bubbles, sidebar, drawers, mic states, inputs).
+   - Instant header Sun/Moon toggle button with `localStorage` persistence and anti-flicker inline initialization.
+
+4. **Previous Chat History & ChatGPT-Style Sidebar**:
+   - Multi-session conversation management stored privately in client `localStorage`.
+   - Collapsible desktop sidebar and smooth mobile slide-out drawer.
+   - Real-time search filter across all past conversations.
+   - Session switching, "+ New Chat", individual chat deletion, and "Clear All History".
+   - Sliding 6-turn context window passed to `/api/chat` for conversational awareness.
+
+5. **Personalized "For You" Intelligence Drawer**:
+   - Analyzes conversation history dynamically without sending private data to external servers.
+   - Tracks 7 core career topics (Superpower, FCI CCM, IIT/IIM Education, Technical Limits, AI Growth, Origins, Team Perceptions).
+   - Recommends unexplored follow-up questions and surfaces verified portfolio metrics that can be asked with a single tap.
 
 ---
 
